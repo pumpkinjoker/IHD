@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Check, ImagePlus, Plus, RotateCcw, Trash2, X } from "lucide-react";
@@ -16,6 +16,7 @@ import { processEvidenceImage } from "@/lib/images/process-evidence-image";
 import { findRequesterByKey, masterData } from "@/lib/master-data";
 import { formatMoney } from "@/lib/money/format-money";
 import { toThaiBahtText } from "@/lib/money/thai-baht-text";
+import { cn } from "@/lib/utils";
 import {
   clearExpenseRequestDraft,
   readExpenseRequestDraft,
@@ -56,6 +57,7 @@ function WorkItemEditor({
   onRemove
 }: WorkItemEditorProps) {
   const [imageError, setImageError] = useState<string>();
+  const [isDraggingEvidence, setIsDraggingEvidence] = useState(false);
   const {
     formState: { errors },
     register,
@@ -84,6 +86,38 @@ function WorkItemEditor({
         error instanceof Error ? error.message : "ไม่สามารถประมวลผลรูปภาพได้"
       );
     }
+  }
+
+  function handleEvidenceDragEnter(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (event.dataTransfer.types.includes("Files")) {
+      setIsDraggingEvidence(true);
+    }
+  }
+
+  function handleEvidenceDragLeave(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setIsDraggingEvidence(false);
+    }
+  }
+
+  function handleEvidenceDragOver(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = "copy";
+  }
+
+  function handleEvidenceDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDraggingEvidence(false);
+
+    void handleEvidenceChange(event.dataTransfer.files);
   }
 
   function removeEvidence() {
@@ -284,7 +318,17 @@ function WorkItemEditor({
 
         <div>
           <h4 className="mb-3 text-base font-semibold">หลักฐานประกอบ</h4>
-          <div className="grid gap-4 md:grid-cols-[240px_1fr]">
+          <div
+            className={cn(
+              "grid gap-4 rounded-md border border-dashed border-border p-3 transition md:grid-cols-[240px_1fr]",
+              isDraggingEvidence && "border-primary bg-primary/5"
+            )}
+            data-testid="evidence-drop-zone"
+            onDragEnter={handleEvidenceDragEnter}
+            onDragLeave={handleEvidenceDragLeave}
+            onDragOver={handleEvidenceDragOver}
+            onDrop={handleEvidenceDrop}
+          >
             <div className="flex h-44 items-center justify-center overflow-hidden rounded-md border border-dashed border-border bg-muted">
               {item.evidenceImage ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -336,7 +380,7 @@ function WorkItemEditor({
                 }
               />
               <p className="text-sm text-muted-foreground">
-                รองรับ JPG, PNG และ WebP ขนาดไม่เกิน 8 MB
+                ลากไฟล์รูปมาวางที่นี่ หรือเลือกจากเครื่อง รองรับ JPG, PNG และ WebP ขนาดไม่เกิน 8 MB
               </p>
             </div>
           </div>

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import path from "node:path";
 import masterData from "../../src/data/master-data.json";
 
 test("creates and previews an expense request draft", async ({ page }) => {
@@ -55,9 +56,29 @@ test("creates and previews an expense request draft", async ({ page }) => {
   await page.getByLabel("สถานที่").fill("Marketing");
   await page.getByLabel("ค่าเบี้ยเลี้ยง").fill("1500");
 
+  const evidenceImagePath = path.resolve("public/brand/toa-logo.png");
+  const evidenceFileChooserPromise = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "อัปโหลดรูป" }).click();
+  await (await evidenceFileChooserPromise).setFiles(evidenceImagePath);
+  await expect(page.getByText(/ไฟล์: toa-logo\.png/)).toBeVisible();
+
+  await page.getByRole("button", { name: "ลบรูป" }).click();
+  await expect(page.getByText(/ไฟล์: toa-logo\.png/)).toHaveCount(0);
+
+  const evidenceDropTransfer = await page.evaluateHandle(async () => {
+    const response = await fetch("/brand/toa-logo.png");
+    const blob = await response.blob();
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(
+      new File([blob], "toa-logo.png", { type: "image/png" })
+    );
+
+    return dataTransfer;
+  });
+
   await page
-    .locator("input[type='file']")
-    .setInputFiles("public/brand/toa-logo.png");
+    .getByTestId("evidence-drop-zone")
+    .dispatchEvent("drop", { dataTransfer: evidenceDropTransfer });
   await expect(page.getByText(/ไฟล์: toa-logo\.png/)).toBeVisible();
 
   await page.getByRole("button", { name: "ยืนยันและดูตัวอย่าง" }).click();

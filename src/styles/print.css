@@ -1,0 +1,48 @@
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: #fff !important;
+  }
+
+  .expense-preview-screen,
+  .expense-page-stage {
+    min-height: auto !important;
+    padding: 0 !important;
+    background: #fff !important;
+    overflow: visible !important;
+  }
+
+  .expense-document-stack {
+    display: block !important;
+    width: auto !important;
+    margin: 0 !important;
+  }
+
+  .expense-page-shell {
+    display: block !important;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .expense-page-shell:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  .expense-request-page {
+    box-shadow: none !important;
+  }
+
+  .supporting-evidence-block {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+}

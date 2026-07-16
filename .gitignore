@@ -1,0 +1,15 @@
+.DS_Store
+.env
+.env*.local
+.next/
+.pnpm-store/
+.playwright-browsers/
+coverage/
+node_modules/
+out/
+playwright-report/
+test-results/
+tmp/
+tsconfig.tsbuildinfo
+.vercel
+docs/reference/

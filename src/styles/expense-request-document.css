@@ -1,0 +1,565 @@
+.expense-preview-screen {
+  min-height: 100vh;
+  background: #e5e7eb;
+}
+
+.expense-floating-toolbar-wrap {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 20;
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+  max-width: calc(100vw - 32px);
+}
+
+.expense-floating-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in oklch, var(--background) 92%, transparent);
+  box-shadow: 0 12px 30px rgb(15 23 42 / 14%);
+  backdrop-filter: blur(12px);
+}
+
+.expense-print-notice {
+  max-width: 360px;
+  margin: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in oklch, var(--background) 96%, transparent);
+  box-shadow: 0 10px 24px rgb(15 23 42 / 12%);
+  color: var(--foreground);
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: right;
+}
+
+.expense-page-stage {
+  min-height: 100vh;
+  padding: 24px 24px 48px;
+  overflow-x: auto;
+}
+
+.expense-document-stack {
+  display: grid;
+  gap: 24px;
+  width: max-content;
+  margin: 0 auto;
+}
+
+.expense-page-shell {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+}
+
+.expense-page-caption {
+  margin: 0;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.expense-request-page {
+  width: 210mm;
+  height: 297mm;
+  box-sizing: border-box;
+  padding: 4mm;
+  background: #fff;
+  color: #000;
+  box-shadow: 0 18px 45px rgb(15 23 42 / 18%);
+  font-family: Tahoma, Arial, "Helvetica Neue", sans-serif;
+  font-size: 9px;
+  font-weight: 400;
+  line-height: 1.18;
+}
+
+.expense-request-page * {
+  box-sizing: border-box;
+  font-weight: 400;
+}
+
+.expense-for-payment {
+  margin: 0;
+  font-size: 10px;
+}
+
+.expense-company-header {
+  display: flex;
+  justify-content: center;
+  min-height: 22mm;
+  padding-top: 4mm;
+  text-align: center;
+}
+
+.expense-company-text {
+  width: 110mm;
+}
+
+.expense-company-thai {
+  margin: 0;
+  font-size: 12px;
+}
+
+.expense-company-english {
+  margin: 1mm 0 0;
+  font-size: 10px;
+}
+
+.expense-document-title {
+  margin: 2mm 0 0;
+  font-size: 10px;
+}
+
+.expense-header-grid {
+  display: grid;
+  grid-template-columns: 58mm 34mm 42mm 59mm;
+  grid-auto-rows: minmax(8mm, auto);
+  gap: 2mm 3mm;
+  align-items: end;
+  margin-bottom: 3mm;
+}
+
+.expense-line-field {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  align-items: end;
+  gap: 2mm;
+}
+
+.expense-line-label {
+  line-height: 1.05;
+}
+
+.expense-line-label span {
+  font-weight: 400;
+}
+
+.expense-line-value {
+  min-height: 4.6mm;
+  padding: 0 1mm 0.5mm;
+  border-bottom: 1px dotted #000;
+  text-align: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.expense-date-field {
+  grid-column: 4;
+}
+
+.expense-payee-field {
+  grid-column: 1;
+}
+
+.expense-employee-field {
+  grid-column: 2;
+}
+
+.expense-department-field {
+  grid-column: 3;
+}
+
+.expense-total-field {
+  grid-column: 4;
+}
+
+.expense-words-field {
+  grid-column: 1 / span 3;
+}
+
+.expense-email-field {
+  grid-column: 4;
+}
+
+.expense-table,
+.expense-entertainment-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.expense-table {
+  border: 1.2px solid #000;
+}
+
+.expense-table th,
+.expense-table td {
+  border: 1px solid #000;
+  padding: 1mm 0.8mm;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.expense-table th {
+  font-size: 8px;
+}
+
+.expense-table th span {
+  font-weight: 400;
+}
+
+.expense-table tbody td {
+  height: 8.6mm;
+  font-size: 9px;
+}
+
+.expense-table .expense-purpose-cell {
+  padding-right: 1mm;
+  padding-left: 1mm;
+  line-height: 1.14;
+  text-align: left;
+  white-space: normal;
+}
+
+.expense-empty-row td {
+  height: 8.6mm;
+}
+
+.expense-number {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.expense-money-cell {
+  text-align: center !important;
+  vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+}
+
+.expense-total-row th,
+.expense-total-row td {
+  height: 7.2mm;
+  font-size: 9px;
+}
+
+.expense-total-row th {
+  text-align: left;
+}
+
+.expense-col-date {
+  width: 7.47%;
+}
+
+.expense-col-items {
+  width: 21.09%;
+}
+
+.expense-col-from {
+  width: 8.87%;
+}
+
+.expense-col-to {
+  width: 9.03%;
+}
+
+.expense-col-km {
+  width: 7.32%;
+}
+
+.expense-col-fare {
+  width: 6.46%;
+}
+
+.expense-col-accommodation {
+  width: 8.79%;
+}
+
+.expense-col-per-diem {
+  width: 7.08%;
+}
+
+.expense-col-entertain {
+  width: 7.63%;
+}
+
+.expense-col-other {
+  width: 8.64%;
+}
+
+.expense-col-total {
+  width: 7.63%;
+}
+
+.expense-entertainment-section {
+  margin-top: 3mm;
+}
+
+.expense-entertainment-title {
+  margin: 0 0 1mm;
+  font-size: 9px;
+}
+
+.expense-entertainment-table {
+  border: 1.2px solid #000;
+}
+
+.expense-entertainment-table th,
+.expense-entertainment-table td {
+  border: 1px solid #000;
+  padding: 1mm;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.expense-entertainment-table th {
+  height: 8mm;
+  font-size: 8px;
+}
+
+.expense-entertainment-table th span {
+  font-weight: 400;
+}
+
+.expense-entertainment-table td {
+  height: 5mm;
+}
+
+.expense-entertainment-table th:nth-child(1) {
+  width: 29%;
+}
+
+.expense-entertainment-table th:nth-child(2) {
+  width: 31%;
+}
+
+.expense-entertainment-table th:nth-child(3) {
+  width: 32%;
+}
+
+.expense-entertainment-table th:nth-child(4) {
+  width: 8%;
+}
+
+.expense-official-notes {
+  margin: 2mm 0 0;
+  font-size: 9px;
+  line-height: 1.25;
+}
+
+.expense-signature-section {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18mm;
+  margin-top: 12mm;
+  padding: 0 1mm;
+}
+
+.expense-signature-block {
+  min-width: 0;
+}
+
+.expense-signature-line,
+.expense-position-line {
+  border-bottom: 1px dotted #000;
+}
+
+.expense-signature-line {
+  height: 5mm;
+}
+
+.expense-signature-name {
+  margin: 1mm 0 0;
+  border-bottom: 1px dotted #000;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.expense-signature-label {
+  margin: 0.8mm 0 0.1mm;
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+.expense-position-row {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 3mm;
+  align-items: end;
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+.expense-handwritten-name {
+  display: inline-grid;
+  grid-template-columns: max-content 32mm max-content;
+  align-items: center;
+}
+
+.expense-handwritten-name-space {
+  display: block;
+  min-width: 32mm;
+}
+
+.expense-position-line {
+  min-width: 0;
+  padding-bottom: 0.5mm;
+  text-align: center;
+}
+
+.expense-position-label {
+  margin: 0.7mm 0 0;
+  font-size: 8px;
+  line-height: 1.45;
+}
+
+.supporting-evidence-page {
+  padding: 0;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.supporting-evidence-page * {
+  font-weight: 400;
+}
+
+.supporting-evidence-company-header {
+  display: grid;
+  grid-template-columns: 17mm 1fr;
+  gap: 5mm;
+  align-items: start;
+  height: 27.5mm;
+  padding: 10mm 16mm 0 17.5mm;
+}
+
+.supporting-evidence-logo {
+  width: 17mm;
+  height: auto;
+}
+
+.supporting-evidence-company-text {
+  color: #0070c0;
+  line-height: 1.22;
+}
+
+.supporting-evidence-company-text p {
+  width: max-content;
+  max-width: 100%;
+  margin: 0;
+  font-weight: 700;
+}
+
+.supporting-evidence-company-thai {
+  padding-bottom: 0.5mm;
+  border-bottom: 1px solid #0070c0;
+  font-size: 16px;
+}
+
+.supporting-evidence-company-english {
+  padding-top: 0.5mm;
+  font-size: 13px;
+}
+
+.supporting-evidence-form {
+  margin: 0 5mm;
+  border: 1px solid #000;
+}
+
+.supporting-evidence-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 13mm;
+  border-bottom: 1px solid #000;
+  font-size: 16px;
+  font-weight: 400;
+}
+
+.supporting-evidence-signer-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  height: 28.5mm;
+  border-bottom: 1px solid #000;
+}
+
+.supporting-evidence-signer-cell {
+  padding: 2.5mm 10.5mm;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.supporting-evidence-signer-cell + .supporting-evidence-signer-cell {
+  border-left: 1px solid #000;
+}
+
+.supporting-evidence-signer-cell p,
+.supporting-evidence-info-cell p {
+  margin: 0;
+}
+
+.supporting-evidence-signature-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 1mm;
+  margin-top: 2mm !important;
+}
+
+.supporting-evidence-dotted-line {
+  display: block;
+  flex: 0 0 48mm;
+  width: 48mm;
+  border-bottom: 1px dotted #000;
+}
+
+.supporting-evidence-block {
+  height: 66.25mm;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.supporting-evidence-date-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 7.4mm;
+  border-bottom: 1px solid #000;
+  background: #cfcfcf;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.supporting-evidence-info-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  height: 20.6mm;
+  border-bottom: 1px solid #000;
+}
+
+.supporting-evidence-info-cell {
+  padding: 3mm 10.5mm;
+  font-size: 14px;
+}
+
+.supporting-evidence-info-cell + .supporting-evidence-info-cell {
+  border-left: 1px solid #000;
+}
+
+.supporting-evidence-image-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 38.25mm;
+  border-bottom: 1px solid #000;
+  border-right: 0;
+  border-left: 0;
+  padding: 2mm;
+}
+
+.supporting-evidence-block:last-child .supporting-evidence-image-row {
+  border-bottom: 0;
+}
+
+.supporting-evidence-image {
+  max-width: 72mm;
+  max-height: 34mm;
+  object-fit: contain;
+}

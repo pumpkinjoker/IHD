@@ -5,13 +5,13 @@ describe("master data", () => {
   it("loads validated team and approver data", () => {
     expect(masterData.team).toHaveLength(1);
     expect(masterData.approvers.authorizedBy.position).toBe(
-      "ผู้อำนวยการฝ่ายการตลาด"
+      "Head of marketing"
     );
   });
 
   it("finds requester by stable employee id key", () => {
-    expect(findRequesterByKey("60112112")?.email).toBe(
-      "sadey_a@toagroup.com"
+    expect(findRequesterByKey("60112369")?.email).toBe(
+      "thanakorn_f@toagroup.com"
     );
   });
 });

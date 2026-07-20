@@ -12,10 +12,10 @@ describe("master data", () => {
   it("sorts team members by Thai first name order", () => {
     expect(masterData.team.map((member) => member.firstName)).toEqual([
       "ชญานิน",
-      "ชรีพร",
       "ชินวัตร",
       "ธนากร",
-      "บรรณพรต"
+      "บรรณพรต",
+      "พัชรีพร"
     ]);
   });
 

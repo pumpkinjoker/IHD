@@ -10,15 +10,6 @@
       "department": "In House Production"
     },
     {
-      "firstName": "ชรีพร",
-      "lastName": "ลี้ครองสกุล",
-      "name": "ชรีพร ลี้ครองสกุล",
-      "employeeId": "11240219",
-      "email": "phatchareepron_l@toagroup.com",
-      "position": "S1",
-      "department": "In House Production"
-    },
-    {
       "firstName": "ชินวัตร",
       "lastName": "ทิพวัลย์",
       "name": "ชินวัตร ทิพวัลย์",
@@ -43,6 +34,15 @@
       "employeeId": "11240752",
       "email": "bunaprot_b@toagroup.com",
       "position": "S2",
+      "department": "In House Production"
+    },
+    {
+      "firstName": "พัชรีพร",
+      "lastName": "ลี้ครองสกุล",
+      "name": "พัชรีพร ลี้ครองสกุล",
+      "employeeId": "11240219",
+      "email": "phatchareepron_l@toagroup.com",
+      "position": "S1",
       "department": "In House Production"
     }
   ],

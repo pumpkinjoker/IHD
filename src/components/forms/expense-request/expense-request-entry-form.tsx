@@ -559,7 +559,7 @@ export function ExpenseRequestEntryForm() {
           {fields.map((field, index) => (
             <WorkItemEditor
               canRemove={fields.length > 1}
-              fieldId={field.id}
+              fieldId={`work-item-${index + 1}`}
               form={form}
               index={index}
               item={watchedItems?.[index] ?? field}

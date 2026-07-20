@@ -1,11 +1,47 @@
 {
   "team": [
     {
+      "firstName": "ชญานิน",
+      "lastName": "จันต๊ะ",
+      "name": "ชญานิน จันต๊ะ",
+      "employeeId": "11200462",
+      "email": "chayanin_J@toagroup.com",
+      "position": "S1",
+      "department": "In House Production"
+    },
+    {
+      "firstName": "ชรีพร",
+      "lastName": "ลี้ครองสกุล",
+      "name": "ชรีพร ลี้ครองสกุล",
+      "employeeId": "11240219",
+      "email": "phatchareepron_l@toagroup.com",
+      "position": "S1",
+      "department": "In House Production"
+    },
+    {
+      "firstName": "ชินวัตร",
+      "lastName": "ทิพวัลย์",
+      "name": "ชินวัตร ทิพวัลย์",
+      "employeeId": "11240248",
+      "email": "chinawat_t@toagroup.com",
+      "position": "S1",
+      "department": "In House Production"
+    },
+    {
       "firstName": "ธนากร",
       "lastName": "ฟูเต็มวงศ์",
       "name": "ธนากร ฟูเต็มวงศ์",
       "employeeId": "60112369",
       "email": "thanakorn_f@toagroup.com",
+      "position": "S2",
+      "department": "In House Production"
+    },
+    {
+      "firstName": "บรรณพรต",
+      "lastName": "บาลใจ",
+      "name": "บรรณพรต บาลใจ",
+      "employeeId": "11240752",
+      "email": "bunaprot_b@toagroup.com",
       "position": "S2",
       "department": "In House Production"
     }

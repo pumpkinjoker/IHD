@@ -44,6 +44,15 @@
       "email": "phatchareepron_l@toagroup.com",
       "position": "S1",
       "department": "In House Production"
+    },
+    {
+      "firstName": "ประภาวรินทร์",
+      "lastName": "รัตนศรีแสงกร",
+      "name": "ประภาวรินทร์ รัตนศรีแสงกร",
+      "employeeId": "11250707",
+      "email": "praphavarine_r@toagroup.com",
+      "position": "S2",
+      "department": "Corporate Marketing"
     }
   ],
   "approvers": {

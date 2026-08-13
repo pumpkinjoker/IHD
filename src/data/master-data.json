@@ -53,6 +53,15 @@
       "email": "praphavarine_r@toagroup.com",
       "position": "S2",
       "department": "Corporate Marketing"
+    },
+    {
+      "firstName": "Kanoknapat",
+      "lastName": "Srisuk",
+      "name": "Kanoknapat Srisuk",
+      "employeeId": "11240479",
+      "email": "kanoknapat_S@toagroup.com",
+      "position": "S2",
+      "department": "Corporate Marketing"
     }
   ],
   "approvers": {

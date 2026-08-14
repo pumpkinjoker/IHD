@@ -4,6 +4,7 @@ import { expenseRequestFormSchema } from "@/schemas/expense-request-form.schema"
 import type { ExpenseRequestForm } from "@/types/expense-request";
 
 const validForm: ExpenseRequestForm = {
+  teamKey: "in-house-production",
   requesterKey: "60112112",
   documentDate: "2026-07-16",
   workItems: [
@@ -40,6 +41,15 @@ describe("expense request validation", () => {
     const result = expenseRequestFormSchema.safeParse({
       ...validForm,
       workItems: [{ ...validForm.workItems[0], perDiem: -1 }]
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("requires a team", () => {
+    const result = expenseRequestFormSchema.safeParse({
+      ...validForm,
+      teamKey: ""
     });
 
     expect(result.success).toBe(false);

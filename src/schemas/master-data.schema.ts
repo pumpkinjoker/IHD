@@ -1,16 +1,30 @@
 import { z } from "zod";
 
-export const teamMemberSchema = z
+const rawTeamMemberSchema = z
   .object({
     firstName: z.string().min(1),
     lastName: z.string().min(1),
     name: z.string().min(1),
     employeeId: z.string().min(1),
     email: z.string().email(),
-    position: z.string().min(1),
-    department: z.string().min(1)
+    position: z.string().min(1)
   })
   .strict();
+
+export const teamSchema = z
+  .object({
+    key: z.string().min(1),
+    name: z.string().min(1),
+    members: z.array(rawTeamMemberSchema).min(1)
+  })
+  .strict()
+  .transform((team) => ({
+    ...team,
+    members: team.members.map((member) => ({
+      ...member,
+      department: team.name
+    }))
+  }));
 
 export const approverSchema = z
   .object({
@@ -23,7 +37,7 @@ export const approverSchema = z
 
 export const masterDataSchema = z
   .object({
-    team: z.array(teamMemberSchema).min(1),
+    teams: z.array(teamSchema).min(1),
     approvers: z
       .object({
         authorizedBy: approverSchema,
@@ -33,6 +47,7 @@ export const masterDataSchema = z
   })
   .strict();
 
-export type TeamMember = z.infer<typeof teamMemberSchema>;
 export type Approver = z.infer<typeof approverSchema>;
 export type MasterData = z.infer<typeof masterDataSchema>;
+export type Team = MasterData["teams"][number];
+export type TeamMember = Team["members"][number];

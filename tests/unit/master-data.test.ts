@@ -1,16 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { findRequesterByKey, masterData } from "@/lib/master-data";
+import {
+  findRequesterByKey,
+  findTeamByRequesterKey,
+  masterData
+} from "@/lib/master-data";
 
 describe("master data", () => {
   it("loads validated team and approver data", () => {
-    expect(masterData.team).toHaveLength(5);
+    expect(masterData.teams).toHaveLength(2);
+    expect(masterData.teams.map((team) => team.members.length)).toEqual([5, 2]);
     expect(masterData.approvers.authorizedBy.position).toBe(
       "Head of marketing"
     );
   });
 
   it("sorts team members by Thai first name order", () => {
-    expect(masterData.team.map((member) => member.firstName)).toEqual([
+    expect(masterData.teams[0].members.map((member) => member.firstName)).toEqual([
       "ชญานิน",
       "ชินวัตร",
       "ธนากร",
@@ -34,6 +39,18 @@ describe("master data", () => {
     );
     expect(findRequesterByKey("11240248")?.email).toBe(
       "chinawat_t@toagroup.com"
+    );
+    expect(findRequesterByKey("11250707")?.department).toBe(
+      "Corporate Marketing"
+    );
+  });
+
+  it("finds the team for an existing requester", () => {
+    expect(findTeamByRequesterKey("60112369")?.key).toBe(
+      "in-house-production"
+    );
+    expect(findTeamByRequesterKey("11240479")?.key).toBe(
+      "corporate-marketing"
     );
   });
 });

@@ -13,7 +13,7 @@ import { Select } from "@/components/ui/select";
 import { calculateExpenseRowTotal, calculateGrandTotal } from "@/lib/calculations/expense";
 import { createDefaultExpenseRequestForm, createDefaultExpenseWorkItem } from "@/lib/expense-request/form-defaults";
 import { processEvidenceImage } from "@/lib/images/process-evidence-image";
-import { findRequesterByKey, masterData } from "@/lib/master-data";
+import { findTeamByKey, getRequesterKey, masterData } from "@/lib/master-data";
 import { formatMoney } from "@/lib/money/format-money";
 import { toThaiBahtText } from "@/lib/money/thai-baht-text";
 import { cn } from "@/lib/utils";
@@ -406,6 +406,7 @@ export function ExpenseRequestEntryForm() {
     handleSubmit,
     register,
     reset,
+    setValue,
   } = form;
   const { append, fields, remove } = useFieldArray({
     control,
@@ -413,10 +414,15 @@ export function ExpenseRequestEntryForm() {
   });
   const watchedItems = useWatch({ control, name: "workItems" });
   const watchedForm = useWatch({ control });
+  const teamKey = useWatch({ control, name: "teamKey" });
   const requesterKey = useWatch({ control, name: "requesterKey" });
+  const selectedTeam = useMemo(() => findTeamByKey(teamKey), [teamKey]);
   const selectedRequester = useMemo(
-    () => findRequesterByKey(requesterKey),
-    [requesterKey]
+    () =>
+      selectedTeam?.members.find(
+        (member) => getRequesterKey(member) === requesterKey
+      ) ?? null,
+    [requesterKey, selectedTeam]
   );
   const grandTotal = calculateGrandTotal(watchedItems ?? []);
 
@@ -482,16 +488,43 @@ export function ExpenseRequestEntryForm() {
     >
       <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
         <h2 className="text-xl font-semibold">ข้อมูลเอกสาร</h2>
-        <div className="mt-5 grid gap-4 md:grid-cols-2">
+        <div className="mt-5 grid gap-4 md:grid-cols-3">
+          <div className="space-y-2">
+            <Label htmlFor="teamKey">ทีม</Label>
+            <Select
+              id="teamKey"
+              {...register("teamKey", {
+                onChange: () => {
+                  setValue("requesterKey", "", {
+                    shouldDirty: true,
+                    shouldValidate: true
+                  });
+                }
+              })}
+              aria-invalid={Boolean(errors.teamKey)}
+            >
+              <option value="">เลือกทีม</option>
+              {masterData.teams.map((team) => (
+                <option key={team.key} value={team.key}>
+                  {team.name}
+                </option>
+              ))}
+            </Select>
+            <FieldError message={errors.teamKey?.message} />
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="requesterKey">ผู้ขอเบิก</Label>
             <Select
               id="requesterKey"
               {...register("requesterKey")}
               aria-invalid={Boolean(errors.requesterKey)}
+              disabled={!selectedTeam}
             >
-              <option value="">เลือกผู้ขอเบิก</option>
-              {masterData.team.map((member) => (
+              <option value="">
+                {selectedTeam ? "เลือกผู้ขอเบิก" : "กรุณาเลือกทีมก่อน"}
+              </option>
+              {selectedTeam?.members.map((member) => (
                 <option key={member.employeeId} value={member.employeeId}>
                   {member.name}
                 </option>
@@ -533,13 +566,15 @@ export function ExpenseRequestEntryForm() {
                 <dd className="font-medium">{selectedRequester.position}</dd>
               </div>
               <div>
-                <dt className="text-muted-foreground">แผนก</dt>
+                <dt className="text-muted-foreground">ทีม</dt>
                 <dd className="font-medium">{selectedRequester.department}</dd>
               </div>
             </dl>
           ) : (
             <p className="mt-3 text-sm text-muted-foreground">
-              เลือกผู้ขอเบิกเพื่อแสดงข้อมูลพนักงาน
+              {selectedTeam
+                ? "เลือกผู้ขอเบิกเพื่อแสดงข้อมูลพนักงาน"
+                : "เลือกทีมก่อน แล้วจึงเลือกผู้ขอเบิก"}
             </p>
           )}
         </div>

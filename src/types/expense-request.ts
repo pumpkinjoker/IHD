@@ -25,6 +25,7 @@ export type ExpenseWorkItem = {
 };
 
 export type ExpenseRequestForm = {
+  teamKey: string;
   requesterKey: string;
   documentDate: string;
   workItems: ExpenseWorkItem[];

@@ -43,6 +43,7 @@ export const expenseWorkItemDraftSchema = z
 
 export const expenseRequestDraftDataSchema = z
   .object({
+    teamKey: textSchema.optional().default(""),
     requesterKey: textSchema,
     documentDate: draftDateSchema,
     workItems: z.array(expenseWorkItemDraftSchema).min(1)
@@ -87,6 +88,7 @@ export const expenseWorkItemSchema = expenseWorkItemDraftSchema.superRefine(
 
 export const expenseRequestFormSchema = expenseRequestDraftDataSchema
   .extend({
+    teamKey: z.string().min(1, "กรุณาเลือกทีม"),
     requesterKey: z.string().min(1, "กรุณาเลือกผู้ขอเบิก"),
     documentDate: draftDateSchema,
     workItems: z.array(expenseWorkItemSchema).min(1, "กรุณาเพิ่มรายการงาน")

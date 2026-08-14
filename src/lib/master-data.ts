@@ -11,9 +11,26 @@ export function getRequesterKey(member: TeamMember) {
   return member.employeeId;
 }
 
-export function findRequesterByKey(requesterKey: string) {
+export function findTeamByKey(teamKey: string) {
+  return masterData.teams.find((team) => team.key === teamKey) ?? null;
+}
+
+export function findTeamByRequesterKey(requesterKey: string) {
   return (
-    masterData.team.find((member) => getRequesterKey(member) === requesterKey) ??
-    null
+    masterData.teams.find((team) =>
+      team.members.some(
+        (member) => getRequesterKey(member) === requesterKey
+      )
+    ) ?? null
+  );
+}
+
+export function findRequesterByKey(requesterKey: string) {
+  const team = findTeamByRequesterKey(requesterKey);
+
+  return (
+    team?.members.find(
+      (member) => getRequesterKey(member) === requesterKey
+    ) ?? null
   );
 }

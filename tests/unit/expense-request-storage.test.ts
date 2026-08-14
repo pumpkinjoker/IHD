@@ -6,6 +6,7 @@ import {
 import type { ExpenseRequestForm } from "@/types/expense-request";
 
 const validForm: ExpenseRequestForm = {
+  teamKey: "in-house-production",
   requesterKey: "60112112",
   documentDate: "2026-07-16",
   workItems: [
@@ -52,6 +53,23 @@ describe("expense request storage", () => {
         JSON.stringify({ version: 99, savedAt: "bad", data: {} })
       )
     ).toBeNull();
+  });
+
+  it("restores the team for drafts saved before team selection was added", () => {
+    const storedDraft = createStoredExpenseRequestDraft(
+      { ...validForm, requesterKey: "60112369" },
+      "2026-07-16T00:00:00.000Z"
+    );
+    const legacyData = {
+      requesterKey: storedDraft.data.requesterKey,
+      documentDate: storedDraft.data.documentDate,
+      workItems: storedDraft.data.workItems
+    };
+    const parsedDraft = parseStoredExpenseRequestDraft(
+      JSON.stringify({ ...storedDraft, data: legacyData })
+    );
+
+    expect(parsedDraft?.data.teamKey).toBe("in-house-production");
   });
 
   it("strips legacy work description values from stored drafts", () => {

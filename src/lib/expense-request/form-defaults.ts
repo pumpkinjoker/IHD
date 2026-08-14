@@ -30,6 +30,7 @@ export function createDefaultExpenseWorkItem(): ExpenseWorkItem {
 
 export function createDefaultExpenseRequestForm(): ExpenseRequestForm {
   return {
+    teamKey: "",
     requesterKey: "",
     documentDate: "",
     workItems: [createDefaultExpenseWorkItem()]

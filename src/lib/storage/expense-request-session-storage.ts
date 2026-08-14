@@ -1,4 +1,5 @@
 import { storedExpenseRequestDraftSchema } from "@/schemas/expense-request-form.schema";
+import { findTeamByRequesterKey } from "@/lib/master-data";
 import type {
   ExpenseRequestForm,
   StoredExpenseRequestDraft
@@ -29,7 +30,23 @@ export function parseStoredExpenseRequestDraft(
     const parsed = JSON.parse(rawValue) as unknown;
     const result = storedExpenseRequestDraftSchema.safeParse(parsed);
 
-    return result.success ? result.data : null;
+    if (!result.success) {
+      return null;
+    }
+
+    if (result.data.data.teamKey || !result.data.data.requesterKey) {
+      return result.data;
+    }
+
+    const team = findTeamByRequesterKey(result.data.data.requesterKey);
+
+    return {
+      ...result.data,
+      data: {
+        ...result.data.data,
+        teamKey: team?.key ?? ""
+      }
+    };
   } catch {
     return null;
   }

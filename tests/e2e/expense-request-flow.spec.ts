@@ -3,7 +3,8 @@ import path from "node:path";
 import masterData from "../../src/data/master-data.json";
 
 test("creates and previews an expense request draft", async ({ page }) => {
-  const requester = masterData.team[0];
+  const team = masterData.teams[1];
+  const requester = team.members[0];
   const approver = masterData.approvers.authorizedBy;
   const consoleErrors: string[] = [];
 
@@ -42,11 +43,16 @@ test("creates and previews an expense request draft", async ({ page }) => {
       );
     })
   ).toBe(true);
+  await expect(page.getByLabel("ผู้ขอเบิก")).toBeDisabled();
+  await page.getByLabel("ทีม").selectOption(team.key);
+  await expect(page.getByLabel("ผู้ขอเบิก")).toBeEnabled();
   await page.getByLabel("ผู้ขอเบิก").selectOption(requester.employeeId);
   await expect(page.getByText(requester.employeeId)).toBeVisible();
   await expect(page.getByText(requester.email)).toBeVisible();
   await expect(page.getByText(requester.position)).toBeVisible();
-  await expect(page.getByText(requester.department)).toBeVisible();
+  await expect(
+    page.getByRole("definition").filter({ hasText: team.name })
+  ).toBeVisible();
 
   await page.getByLabel("วันที่เอกสาร").fill("2026-07-16");
   await page.getByLabel("วันที่ปฏิบัติงาน").fill("2026-07-16");
@@ -160,6 +166,7 @@ test("creates and previews an expense request draft", async ({ page }) => {
   await page.getByRole("button", { name: "ย้อนกลับ" }).click();
 
   await expect(page).toHaveURL(/\/documents\/expense-request\/new$/);
+  await expect(page.getByLabel("ทีม")).toHaveValue(team.key);
   await expect(page.getByLabel("ผู้ขอเบิก")).toHaveValue(requester.employeeId);
   await expect(page.getByLabel("วันที่เอกสาร")).toHaveValue("2026-07-16");
   await expect(page.getByLabel("หัวข้องาน")).toHaveValue("ถ่ายวิดีโอ");

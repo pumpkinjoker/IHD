@@ -9,7 +9,7 @@ import { FieldError } from "@/components/ui/field-error";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { SearchableDropdown } from "@/components/ui/searchable-dropdown";
 import { calculateExpenseRowTotal, calculateGrandTotal } from "@/lib/calculations/expense";
 import { createDefaultExpenseRequestForm, createDefaultExpenseWorkItem } from "@/lib/expense-request/form-defaults";
 import { processEvidenceImage } from "@/lib/images/process-evidence-image";
@@ -424,6 +424,23 @@ export function ExpenseRequestEntryForm() {
       ) ?? null,
     [requesterKey, selectedTeam]
   );
+  const teamOptions = useMemo(
+    () =>
+      masterData.teams.map((team) => ({
+        value: team.key,
+        label: team.name
+      })),
+    []
+  );
+  const requesterOptions = useMemo(
+    () =>
+      selectedTeam?.members.map((member) => ({
+        value: member.employeeId,
+        label: member.name,
+        keywords: `${member.firstName} ${member.lastName} ${member.employeeId} ${member.email}`
+      })) ?? [],
+    [selectedTeam]
+  );
   const grandTotal = calculateGrandTotal(watchedItems ?? []);
 
   useEffect(() => {
@@ -491,45 +508,51 @@ export function ExpenseRequestEntryForm() {
         <div className="mt-5 grid gap-4 md:grid-cols-3">
           <div className="space-y-2">
             <Label htmlFor="teamKey">ทีม</Label>
-            <Select
+            <input type="hidden" {...register("teamKey")} />
+            <SearchableDropdown
               id="teamKey"
-              {...register("teamKey", {
-                onChange: () => {
-                  setValue("requesterKey", "", {
-                    shouldDirty: true,
-                    shouldValidate: true
-                  });
-                }
-              })}
-              aria-invalid={Boolean(errors.teamKey)}
-            >
-              <option value="">เลือกทีม</option>
-              {masterData.teams.map((team) => (
-                <option key={team.key} value={team.key}>
-                  {team.name}
-                </option>
-              ))}
-            </Select>
+              invalid={Boolean(errors.teamKey)}
+              onValueChange={(nextTeamKey) => {
+                setValue("teamKey", nextTeamKey, {
+                  shouldDirty: true,
+                  shouldTouch: true,
+                  shouldValidate: true
+                });
+                setValue("requesterKey", "", {
+                  shouldDirty: true,
+                  shouldValidate: true
+                });
+              }}
+              options={teamOptions}
+              placeholder="เลือกทีม"
+              value={teamKey}
+            />
             <FieldError message={errors.teamKey?.message} />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="requesterKey">ผู้ขอเบิก</Label>
-            <Select
-              id="requesterKey"
-              {...register("requesterKey")}
-              aria-invalid={Boolean(errors.requesterKey)}
+            <input type="hidden" {...register("requesterKey")} />
+            <SearchableDropdown
               disabled={!selectedTeam}
-            >
-              <option value="">
-                {selectedTeam ? "เลือกผู้ขอเบิก" : "กรุณาเลือกทีมก่อน"}
-              </option>
-              {selectedTeam?.members.map((member) => (
-                <option key={member.employeeId} value={member.employeeId}>
-                  {member.name}
-                </option>
-              ))}
-            </Select>
+              emptyMessage="ไม่พบรายชื่อที่ค้นหา"
+              id="requesterKey"
+              invalid={Boolean(errors.requesterKey)}
+              onValueChange={(nextRequesterKey) => {
+                setValue("requesterKey", nextRequesterKey, {
+                  shouldDirty: true,
+                  shouldTouch: true,
+                  shouldValidate: true
+                });
+              }}
+              options={requesterOptions}
+              placeholder={
+                selectedTeam ? "เลือกผู้ขอเบิก" : "กรุณาเลือกทีมก่อน"
+              }
+              searchable
+              searchPlaceholder="ค้นหาชื่อหรือรหัสพนักงาน"
+              value={requesterKey}
+            />
             <FieldError message={errors.requesterKey?.message} />
           </div>
 

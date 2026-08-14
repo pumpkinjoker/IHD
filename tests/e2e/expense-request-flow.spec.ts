@@ -44,9 +44,19 @@ test("creates and previews an expense request draft", async ({ page }) => {
     })
   ).toBe(true);
   await expect(page.getByLabel("ผู้ขอเบิก")).toBeDisabled();
-  await page.getByLabel("ทีม").selectOption(team.key);
+  await page.getByLabel("ทีม").click();
+  await page.getByRole("option", { name: team.name }).click();
   await expect(page.getByLabel("ผู้ขอเบิก")).toBeEnabled();
-  await page.getByLabel("ผู้ขอเบิก").selectOption(requester.employeeId);
+  await page.getByLabel("ผู้ขอเบิก").click();
+  await page
+    .getByLabel("ค้นหาชื่อหรือรหัสพนักงาน")
+    .fill(requester.firstName);
+  await expect(
+    page.getByRole("option", { name: new RegExp(requester.name) })
+  ).toBeVisible();
+  await page
+    .getByRole("option", { name: new RegExp(requester.name) })
+    .click();
   await expect(page.getByText(requester.employeeId)).toBeVisible();
   await expect(page.getByText(requester.email)).toBeVisible();
   await expect(page.getByText(requester.position)).toBeVisible();
@@ -166,8 +176,8 @@ test("creates and previews an expense request draft", async ({ page }) => {
   await page.getByRole("button", { name: "ย้อนกลับ" }).click();
 
   await expect(page).toHaveURL(/\/documents\/expense-request\/new$/);
-  await expect(page.getByLabel("ทีม")).toHaveValue(team.key);
-  await expect(page.getByLabel("ผู้ขอเบิก")).toHaveValue(requester.employeeId);
+  await expect(page.getByLabel("ทีม")).toHaveText(team.name);
+  await expect(page.getByLabel("ผู้ขอเบิก")).toHaveText(requester.name);
   await expect(page.getByLabel("วันที่เอกสาร")).toHaveValue("2026-07-16");
   await expect(page.getByLabel("หัวข้องาน")).toHaveValue("ถ่ายวิดีโอ");
   await expect(page.getByLabel("ค่าเบี้ยเลี้ยง")).toHaveValue("1500");

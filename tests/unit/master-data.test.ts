@@ -8,7 +8,7 @@ import {
 describe("master data", () => {
   it("loads validated team and approver data", () => {
     expect(masterData.teams).toHaveLength(2);
-    expect(masterData.teams.map((team) => team.members.length)).toEqual([5, 2]);
+    expect(masterData.teams.map((team) => team.members.length)).toEqual([5, 3]);
     expect(masterData.approvers.authorizedBy.position).toBe(
       "Head of marketing"
     );
@@ -42,6 +42,9 @@ describe("master data", () => {
     );
     expect(findRequesterByKey("11250707")?.department).toBe(
       "Corporate Marketing"
+    );
+    expect(findRequesterByKey("11250708")?.email).toBe(
+      "pakawat_j@toagroup.com"
     );
   });
 

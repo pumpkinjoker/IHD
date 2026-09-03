@@ -1,13 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  clearExpenseRequestDraft,
   createStoredExpenseRequestDraft,
-  parseStoredExpenseRequestDraft
+  parseStoredExpenseRequestDraft,
+  readExpenseRequestDraft,
+  writeExpenseRequestDraft
 } from "@/lib/storage/expense-request-session-storage";
 import type { ExpenseRequestForm } from "@/types/expense-request";
 
 const validForm: ExpenseRequestForm = {
   teamKey: "in-house-production",
-  requesterKey: "60112112",
+  requesterKey: "11200462",
   documentDate: "2026-07-16",
   workItems: [
     {
@@ -35,6 +38,11 @@ const validForm: ExpenseRequestForm = {
 };
 
 describe("expense request storage", () => {
+  afterEach(() => {
+    clearExpenseRequestDraft();
+    vi.unstubAllGlobals();
+  });
+
   it("validates stored draft shape", () => {
     const storedDraft = createStoredExpenseRequestDraft(
       validForm,
@@ -70,6 +78,22 @@ describe("expense request storage", () => {
     );
 
     expect(parsedDraft?.data.teamKey).toBe("in-house-production");
+    expect(parsedDraft?.data.requesterKey).toBe("11260369");
+  });
+
+  it("keeps the current draft available when session storage is full", () => {
+    vi.stubGlobal("window", {
+      sessionStorage: {
+        getItem: () => null,
+        setItem: () => {
+          throw new Error("QuotaExceededError");
+        },
+        removeItem: () => undefined
+      }
+    });
+
+    expect(writeExpenseRequestDraft(validForm)).toBe(false);
+    expect(readExpenseRequestDraft()?.data).toEqual(validForm);
   });
 
   it("strips legacy work description values from stored drafts", () => {

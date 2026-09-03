@@ -34,7 +34,7 @@ describe("master data", () => {
     expect(findRequesterByKey("11240752")?.email).toBe(
       "bunaprot_b@toagroup.com"
     );
-    expect(findRequesterByKey("60112369")?.email).toBe(
+    expect(findRequesterByKey("11260369")?.email).toBe(
       "thanakorn_f@toagroup.com"
     );
     expect(findRequesterByKey("11240248")?.email).toBe(
@@ -49,7 +49,7 @@ describe("master data", () => {
   });
 
   it("finds the team for an existing requester", () => {
-    expect(findTeamByRequesterKey("60112369")?.key).toBe(
+    expect(findTeamByRequesterKey("11260369")?.key).toBe(
       "in-house-production"
     );
     expect(findTeamByRequesterKey("11240479")?.key).toBe(

@@ -8,6 +8,12 @@ import type {
 export const EXPENSE_REQUEST_DRAFT_STORAGE_KEY =
   "document-generator:expense-request:draft";
 
+const LEGACY_REQUESTER_KEYS: Record<string, string> = {
+  "60112369": "11260369"
+};
+
+let volatileDraft: StoredExpenseRequestDraft | null = null;
+
 export function createStoredExpenseRequestDraft(
   data: ExpenseRequestForm,
   savedAt = new Date().toISOString()
@@ -34,17 +40,17 @@ export function parseStoredExpenseRequestDraft(
       return null;
     }
 
-    if (result.data.data.teamKey || !result.data.data.requesterKey) {
-      return result.data;
-    }
-
-    const team = findTeamByRequesterKey(result.data.data.requesterKey);
+    const requesterKey =
+      LEGACY_REQUESTER_KEYS[result.data.data.requesterKey] ??
+      result.data.data.requesterKey;
+    const team = requesterKey ? findTeamByRequesterKey(requesterKey) : null;
 
     return {
       ...result.data,
       data: {
         ...result.data.data,
-        teamKey: team?.key ?? ""
+        requesterKey: team ? requesterKey : "",
+        teamKey: team?.key ?? result.data.data.teamKey
       }
     };
   } catch {
@@ -57,20 +63,36 @@ export function readExpenseRequestDraft() {
     return null;
   }
 
-  return parseStoredExpenseRequestDraft(
-    window.sessionStorage.getItem(EXPENSE_REQUEST_DRAFT_STORAGE_KEY)
-  );
+  if (volatileDraft) {
+    return volatileDraft;
+  }
+
+  try {
+    return parseStoredExpenseRequestDraft(
+      window.sessionStorage.getItem(EXPENSE_REQUEST_DRAFT_STORAGE_KEY)
+    );
+  } catch {
+    return null;
+  }
 }
 
 export function writeExpenseRequestDraft(data: ExpenseRequestForm) {
   if (typeof window === "undefined") {
-    return;
+    return false;
   }
 
-  window.sessionStorage.setItem(
-    EXPENSE_REQUEST_DRAFT_STORAGE_KEY,
-    JSON.stringify(createStoredExpenseRequestDraft(data))
-  );
+  const storedDraft = createStoredExpenseRequestDraft(data);
+  volatileDraft = storedDraft;
+
+  try {
+    window.sessionStorage.setItem(
+      EXPENSE_REQUEST_DRAFT_STORAGE_KEY,
+      JSON.stringify(storedDraft)
+    );
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function clearExpenseRequestDraft() {
@@ -78,5 +100,11 @@ export function clearExpenseRequestDraft() {
     return;
   }
 
-  window.sessionStorage.removeItem(EXPENSE_REQUEST_DRAFT_STORAGE_KEY);
+  volatileDraft = null;
+
+  try {
+    window.sessionStorage.removeItem(EXPENSE_REQUEST_DRAFT_STORAGE_KEY);
+  } catch {
+    // The in-memory draft has already been cleared.
+  }
 }

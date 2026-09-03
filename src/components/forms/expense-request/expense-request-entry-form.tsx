@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ClipboardEvent,
+  type DragEvent
+} from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Check, ImagePlus, Plus, RotateCcw, Trash2, X } from "lucide-react";
@@ -67,9 +74,7 @@ function WorkItemEditor({
   const rowTotal = calculateExpenseRowTotal(item);
   const imageInputId = `evidence-${fieldId}`;
 
-  async function handleEvidenceChange(fileList: FileList | null) {
-    const file = fileList?.item(0);
-
+  async function handleEvidenceFile(file: File | null) {
     if (!file) {
       return;
     }
@@ -86,6 +91,10 @@ function WorkItemEditor({
         error instanceof Error ? error.message : "ไม่สามารถประมวลผลรูปภาพได้"
       );
     }
+  }
+
+  function handleEvidenceChange(fileList: FileList | null) {
+    void handleEvidenceFile(fileList?.item(0) ?? null);
   }
 
   function handleEvidenceDragEnter(event: DragEvent<HTMLDivElement>) {
@@ -117,7 +126,20 @@ function WorkItemEditor({
     event.stopPropagation();
     setIsDraggingEvidence(false);
 
-    void handleEvidenceChange(event.dataTransfer.files);
+    handleEvidenceChange(event.dataTransfer.files);
+  }
+
+  function handleEvidencePaste(event: ClipboardEvent<HTMLDivElement>) {
+    const imageFile = Array.from(event.clipboardData.items)
+      .find((item) => item.kind === "file" && item.type.startsWith("image/"))
+      ?.getAsFile();
+
+    if (!imageFile) {
+      return;
+    }
+
+    event.preventDefault();
+    void handleEvidenceFile(imageFile);
   }
 
   function removeEvidence() {
@@ -319,8 +341,9 @@ function WorkItemEditor({
         <div>
           <h4 className="mb-3 text-base font-semibold">หลักฐานประกอบ</h4>
           <div
+            aria-label={`พื้นที่แนบรูปหลักฐานรายการที่ ${index + 1}`}
             className={cn(
-              "grid gap-4 rounded-md border border-dashed border-border p-3 transition md:grid-cols-[240px_1fr]",
+              "grid gap-4 rounded-md border border-dashed border-border p-3 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:grid-cols-[240px_1fr]",
               isDraggingEvidence && "border-primary bg-primary/5"
             )}
             data-testid="evidence-drop-zone"
@@ -328,6 +351,8 @@ function WorkItemEditor({
             onDragLeave={handleEvidenceDragLeave}
             onDragOver={handleEvidenceDragOver}
             onDrop={handleEvidenceDrop}
+            onPaste={handleEvidencePaste}
+            tabIndex={0}
           >
             <div className="flex h-44 items-center justify-center overflow-hidden rounded-md border border-dashed border-border bg-muted">
               {item.evidenceImage ? (
@@ -350,7 +375,7 @@ function WorkItemEditor({
                 className="hidden"
                 id={imageInputId}
                 onChange={(event) => {
-                  void handleEvidenceChange(event.target.files);
+                  handleEvidenceChange(event.target.files);
                   event.target.value = "";
                 }}
                 type="file"
@@ -380,7 +405,8 @@ function WorkItemEditor({
                 }
               />
               <p className="text-sm text-muted-foreground">
-                ลากไฟล์รูปมาวางที่นี่ หรือเลือกจากเครื่อง รองรับ JPG, PNG และ WebP ขนาดไม่เกิน 8 MB
+                คลิกบริเวณนี้แล้ววางรูปด้วย Cmd+V หรือ Ctrl+V ลากไฟล์มาวาง
+                หรือเลือกจากเครื่อง รองรับ JPG, PNG และ WebP ขนาดไม่เกิน 8 MB
               </p>
             </div>
           </div>

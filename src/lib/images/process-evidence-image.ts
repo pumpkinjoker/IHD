@@ -10,8 +10,11 @@ export const ACCEPTED_EVIDENCE_IMAGE_TYPES = [
 ] as const;
 
 export const MAX_EVIDENCE_IMAGE_SIZE_BYTES = 8 * 1024 * 1024;
-const MAX_LONG_EDGE = 1800;
-const JPEG_QUALITY = 0.86;
+const MAX_LONG_EDGE = 1200;
+const MIN_LONG_EDGE = 640;
+const TARGET_DATA_URL_LENGTH = 150_000;
+const INITIAL_JPEG_QUALITY = 0.76;
+const MIN_JPEG_QUALITY = 0.5;
 
 export class EvidenceImageError extends Error {
   constructor(message: string) {
@@ -24,16 +27,58 @@ function isAcceptedImageType(type: string): type is EvidenceImageMimeType {
   return ACCEPTED_EVIDENCE_IMAGE_TYPES.some((acceptedType) => acceptedType === type);
 }
 
-function canvasToDataUrl(canvas: HTMLCanvasElement, mimeType: string) {
-  if (mimeType === "image/png") {
-    return canvas.toDataURL("image/png");
+function drawBitmap(
+  canvas: HTMLCanvasElement,
+  bitmap: ImageBitmap,
+  width: number,
+  height: number
+) {
+  canvas.width = width;
+  canvas.height = height;
+
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    throw new EvidenceImageError("ไม่สามารถประมวลผลรูปภาพได้");
   }
 
-  if (mimeType === "image/webp") {
-    return canvas.toDataURL("image/webp", JPEG_QUALITY);
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, width, height);
+  context.drawImage(bitmap, 0, 0, width, height);
+}
+
+function compressBitmap(bitmap: ImageBitmap) {
+  const initialScale = Math.min(
+    1,
+    MAX_LONG_EDGE / Math.max(bitmap.width, bitmap.height)
+  );
+  let width = Math.max(1, Math.round(bitmap.width * initialScale));
+  let height = Math.max(1, Math.round(bitmap.height * initialScale));
+  let quality = INITIAL_JPEG_QUALITY;
+  const canvas = document.createElement("canvas");
+  let dataUrl = "";
+
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    drawBitmap(canvas, bitmap, width, height);
+    dataUrl = canvas.toDataURL("image/jpeg", quality);
+
+    if (
+      dataUrl.length <= TARGET_DATA_URL_LENGTH ||
+      Math.max(width, height) <= MIN_LONG_EDGE
+    ) {
+      break;
+    }
+
+    const nextScale = Math.max(
+      0.72,
+      Math.sqrt(TARGET_DATA_URL_LENGTH / dataUrl.length) * 0.92
+    );
+    width = Math.max(1, Math.round(width * nextScale));
+    height = Math.max(1, Math.round(height * nextScale));
+    quality = Math.max(MIN_JPEG_QUALITY, quality - 0.06);
   }
 
-  return canvas.toDataURL("image/jpeg", JPEG_QUALITY);
+  return dataUrl;
 }
 
 export async function processEvidenceImage(file: File): Promise<EvidenceImage> {
@@ -48,26 +93,17 @@ export async function processEvidenceImage(file: File): Promise<EvidenceImage> {
   }
 
   const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, MAX_LONG_EDGE / Math.max(bitmap.width, bitmap.height));
-  const width = Math.max(1, Math.round(bitmap.width * scale));
-  const height = Math.max(1, Math.round(bitmap.height * scale));
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
+  let dataUrl: string;
 
-  const context = canvas.getContext("2d");
-
-  if (!context) {
+  try {
+    dataUrl = compressBitmap(bitmap);
+  } finally {
     bitmap.close();
-    throw new EvidenceImageError("ไม่สามารถประมวลผลรูปภาพได้");
   }
-
-  context.drawImage(bitmap, 0, 0, width, height);
-  bitmap.close();
 
   return {
     fileName: file.name,
-    mimeType,
-    dataUrl: canvasToDataUrl(canvas, mimeType)
+    mimeType: "image/jpeg",
+    dataUrl
   };
 }

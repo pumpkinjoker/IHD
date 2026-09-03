@@ -97,6 +97,25 @@ test("creates and previews an expense request draft", async ({ page }) => {
     .dispatchEvent("drop", { dataTransfer: evidenceDropTransfer });
   await expect(page.getByText(/ไฟล์: toa-logo\.png/)).toBeVisible();
 
+  await page.getByRole("button", { name: "ลบรูป" }).click();
+  await page
+    .getByLabel("พื้นที่แนบรูปหลักฐานรายการที่ 1")
+    .evaluate(async (dropZone) => {
+      const response = await fetch("/brand/toa-logo.png");
+      const blob = await response.blob();
+      const clipboardData = new DataTransfer();
+      clipboardData.items.add(
+        new File([blob], "pasted-logo.png", { type: "image/png" })
+      );
+      dropZone.dispatchEvent(
+        new ClipboardEvent("paste", {
+          bubbles: true,
+          clipboardData
+        })
+      );
+    });
+  await expect(page.getByText(/ไฟล์: pasted-logo\.png/)).toBeVisible();
+
   await page.getByRole("button", { name: "ยืนยันและดูตัวอย่าง" }).click();
 
   await expect(page).toHaveURL(/\/documents\/expense-request\/preview$/);
@@ -181,6 +200,77 @@ test("creates and previews an expense request draft", async ({ page }) => {
   await expect(page.getByLabel("วันที่เอกสาร")).toHaveValue("2026-07-16");
   await expect(page.getByLabel("หัวข้องาน")).toHaveValue("ถ่ายวิดีโอ");
   await expect(page.getByLabel("ค่าเบี้ยเลี้ยง")).toHaveValue("1500");
-  await expect(page.getByText(/ไฟล์: toa-logo\.png/)).toBeVisible();
+  await expect(page.getByText(/ไฟล์: pasted-logo\.png/)).toBeVisible();
   expect(consoleErrors).toEqual([]);
+});
+
+test("creates a preview with eleven expense items", async ({ page }) => {
+  const team = masterData.teams[0];
+  const requester = team.members[0];
+  const pageErrors: string[] = [];
+
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+
+  await page.goto("/documents/expense-request/new");
+  await page.getByLabel("ทีม").click();
+  await page.getByRole("option", { name: team.name }).click();
+  await page.getByLabel("ผู้ขอเบิก").click();
+  await page
+    .getByRole("option", { name: new RegExp(requester.name) })
+    .click();
+  await page.getByLabel("วันที่เอกสาร").fill("2026-09-03");
+  const largeEvidenceBase64 = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 900;
+    canvas.height = 900;
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      throw new Error("Canvas is unavailable");
+    }
+
+    const image = context.createImageData(canvas.width, canvas.height);
+    let seed = 42;
+
+    for (let index = 0; index < image.data.length; index += 4) {
+      seed = (seed * 1_664_525 + 1_013_904_223) >>> 0;
+      image.data[index] = seed & 255;
+      image.data[index + 1] = (seed >>> 8) & 255;
+      image.data[index + 2] = (seed >>> 16) & 255;
+      image.data[index + 3] = 255;
+    }
+
+    context.putImageData(image, 0, 0);
+    return canvas.toDataURL("image/png").split(",")[1];
+  });
+  const largeEvidence = {
+    name: "large-evidence.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(largeEvidenceBase64, "base64")
+  };
+
+  for (let index = 0; index < 11; index += 1) {
+    if (index > 0) {
+      await page.getByRole("button", { name: "เพิ่มรายการงาน" }).click();
+    }
+
+    await page
+      .getByLabel("วันที่ปฏิบัติงาน")
+      .nth(index)
+      .fill("2026-09-03");
+    await page.getByLabel("หัวข้องาน").nth(index).fill(`รายการที่ ${index + 1}`);
+    await page
+      .locator('input[type="file"]')
+      .nth(index)
+      .setInputFiles(largeEvidence);
+  }
+
+  await expect(page.getByText(/ไฟล์: large-evidence\.png/)).toHaveCount(11);
+  await page.getByRole("button", { name: "ยืนยันและดูตัวอย่าง" }).click();
+
+  await expect(page).toHaveURL(/\/documents\/expense-request\/preview$/);
+  await expect(
+    page.locator("img[alt^='หลักฐานประกอบรายการที่']")
+  ).toHaveCount(11);
+  expect(pageErrors).toEqual([]);
 });

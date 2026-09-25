@@ -43,6 +43,14 @@
           "employeeId": "11240219",
           "email": "phatchareepron_l@toagroup.com",
           "position": "S1"
+        },
+        {
+          "firstName": "วีรวุฒิ",
+          "lastName": "สิทธิจันดาวงศ์",
+          "name": "วีรวุฒิ สิทธิจันดาวงศ์",
+          "employeeId": "11260634",
+          "email": "weerawut_s@toagroup.com",
+          "position": "S2"
         }
       ]
     },
@@ -51,19 +59,19 @@
       "name": "Corporate Marketing",
       "members": [
         {
-          "firstName": "ประภาวรินทร์",
-          "lastName": "รัตนศรีแสงกร",
-          "name": "ประภาวรินทร์ รัตนศรีแสงกร",
-          "employeeId": "11250707",
-          "email": "praphavarine_r@toagroup.com",
-          "position": "S2"
-        },
-        {
           "firstName": "กนกนภัส",
           "lastName": "ศรีสุข",
           "name": "กนกนภัส ศรีสุข",
           "employeeId": "11240479",
           "email": "kanoknapat_S@toagroup.com",
+          "position": "S2"
+        },
+        {
+          "firstName": "ประภาวรินทร์",
+          "lastName": "รัตนศรีแสงกร",
+          "name": "ประภาวรินทร์ รัตนศรีแสงกร",
+          "employeeId": "11250707",
+          "email": "praphavarine_r@toagroup.com",
           "position": "S2"
         },
         {

@@ -5,14 +5,6 @@
       "name": "In House Production",
       "members": [
         {
-          "firstName": "ชญานิน",
-          "lastName": "จันต๊ะ",
-          "name": "ชญานิน จันต๊ะ",
-          "employeeId": "11200462",
-          "email": "chayanin_J@toagroup.com",
-          "position": "S1"
-        },
-        {
           "firstName": "ชินวัตร",
           "lastName": "ทิพวัลย์",
           "name": "ชินวัตร ทิพวัลย์",
@@ -27,6 +19,14 @@
           "employeeId": "11260369",
           "email": "thanakorn_f@toagroup.com",
           "position": "S2"
+        },
+        {
+          "firstName": "นริศา",
+          "lastName": "สุมะมานนท์",
+          "name": "นริศา สุมะมานนท์",
+          "employeeId": "11260708",
+          "email": "narisa_s@toagroup.com",
+          "position": "Professional 2"
         },
         {
           "firstName": "บรรณพรต",

@@ -8,7 +8,7 @@ import {
 describe("master data", () => {
   it("loads validated team and approver data", () => {
     expect(masterData.teams).toHaveLength(2);
-    expect(masterData.teams.map((team) => team.members.length)).toEqual([5, 3]);
+    expect(masterData.teams.map((team) => team.members.length)).toEqual([6, 3]);
     expect(masterData.approvers.authorizedBy.position).toBe(
       "Head of marketing"
     );
@@ -16,17 +16,25 @@ describe("master data", () => {
 
   it("sorts team members by Thai first name order", () => {
     expect(masterData.teams[0].members.map((member) => member.firstName)).toEqual([
-      "ชญานิน",
       "ชินวัตร",
       "ธนากร",
+      "นริศา",
       "บรรณพรต",
-      "พัชรีพร"
+      "พัชรีพร",
+      "วีรวุฒิ"
     ]);
   });
 
   it("finds requester by stable employee id key", () => {
-    expect(findRequesterByKey("11200462")?.email).toBe(
-      "chayanin_J@toagroup.com"
+    expect(findRequesterByKey("11200462")).toBeNull();
+    expect(findRequesterByKey("11260708")).toMatchObject({
+      name: "นริศา สุมะมานนท์",
+      email: "narisa_s@toagroup.com",
+      position: "Professional 2",
+      department: "In House Production"
+    });
+    expect(findTeamByRequesterKey("11260708")?.key).toBe(
+      "in-house-production"
     );
     expect(findRequesterByKey("11240219")?.email).toBe(
       "phatchareepron_l@toagroup.com"

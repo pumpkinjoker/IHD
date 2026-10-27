@@ -7,6 +7,15 @@ import type { IntakeReply } from "./intake";
 import { validMonth } from "./records";
 
 export const SUMMARY_PAGE_SIZE = 5;
+export function parseSummaryLink(text: string, currentMonth: string) {
+  const match = /^(?:ขอลิงก์สรุป|ขอลิงค์สรุป|ดูลิงก์สรุป)(?:\s+(\d{4}-\d{2}))?$/.exec(text.trim());
+  const month = match?.[1] || currentMonth;
+  return match && validMonth(month) ? { month } : null;
+}
+export function parseSummaryLinkPostback(data: string) {
+  const match = /^summary-link:(\d{4}-\d{2})$/.exec(data);
+  return match && validMonth(match[1]) ? { month: match[1] } : null;
+}
 export function parseSummaryCommand(text: string, currentMonth: string) {
   const match = /^(?:ดูสรุปตาราง|สรุปตาราง|ดูสรุป)(?:\s+(\d{4}-\d{2}))?$/.exec(text.trim());
   const month = match?.[1] || currentMonth;
@@ -31,6 +40,7 @@ export async function summaryReply(store: Pick<SupabaseLineStore, "employeeEntri
     buttons: [
       ...(offset ? [{ label: "ก่อนหน้า", data: `summary:${month}:${Math.max(0, offset - SUMMARY_PAGE_SIZE)}` }] : []),
       ...(offset + SUMMARY_PAGE_SIZE < items.length ? [{ label: "ถัดไป", data: `summary:${month}:${offset + SUMMARY_PAGE_SIZE}` }] : []),
+      ...(items.length ? [{ label: "ขอลิงก์สรุป", data: `summary-link:${month}` }] : []),
       hasDraft ? { label: "กลับรายการที่ค้าง", data: "intake:resume" } : { label: "เพิ่มข้อมูลหน้างาน", data: "intake:start" }
     ]
   };

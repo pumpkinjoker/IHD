@@ -8,6 +8,7 @@ describe("calendar-month test image retention", () => {
     const transport: typeof fetch = async (url, init) => {
       const path = String(url);
       calls.push({ url: path, method: init?.method || "GET", body: init?.body ? JSON.parse(init.body as string) : null });
+      if (path.includes("line_summary_previews")) return Response.json([]);
       if (path.includes("line_claim_media")) return Response.json(true);
       if (path.includes("line_purge_expired_data")) return Response.json({ entries: 0, events: 0 });
       if (path.includes("line_evidence_files")) return Response.json([]);
@@ -38,7 +39,7 @@ describe("calendar-month test image retention", () => {
     const calls: { url: string; method?: string; body: unknown }[] = [];
     const transport: typeof fetch = async (url, init) => {
       calls.push({ url: String(url), method: init?.method, body: init?.body ? JSON.parse(init.body as string) : null });
-      if (String(url).includes("line_monthly_reports")) return Response.json([]);
+      if (String(url).includes("line_monthly_reports") || String(url).includes("line_summary_previews")) return Response.json([]);
       if (String(url).includes("line_claim_media")) return Response.json(true);
       if (String(url).includes("line_purge_expired_data")) return Response.json({ entries: JSON.parse(init!.body as string).p_references.length ? 1 : 0, events: 0 });
       if (String(url).includes("select=")) {

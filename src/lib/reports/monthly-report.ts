@@ -7,18 +7,20 @@ import type { TeamMember } from "@/types/master-data";
 
 export const REPORT_STORAGE_ORIGIN = "https://pqyvtdvskovhbsjduskr.supabase.co";
 export const REPORT_BUCKET = "ihd-monthly-reports";
-export function isReportAsset(value: string) {
+function isSignedAsset(value: string, buckets: string[]) {
   try {
     const url = new URL(value);
     return url.origin === REPORT_STORAGE_ORIGIN && !url.username && !url.password
-      && url.pathname.startsWith(`/storage/v1/object/sign/${REPORT_BUCKET}/`) && Boolean(url.searchParams.get("token"));
+      && buckets.some((bucket) => url.pathname.startsWith(`/storage/v1/object/sign/${bucket}/`)) && Boolean(url.searchParams.get("token"));
   } catch { return false; }
 }
-const signedUrlSchema = z.string().refine(isReportAsset);
+export const isReportAsset = (value: string) => isSignedAsset(value, [REPORT_BUCKET]);
+const signedUrlSchema = z.string().refine((value) => isSignedAsset(value, [REPORT_BUCKET, "ihd-evidence-test"]));
 const requesterSchema = z.object({ employeeId: z.string().regex(/^\d{8}$/), firstName: z.string(), lastName: z.string(), name: z.string(), email: z.email(), position: z.string(), department: z.string() });
 export const monthlyReportSchema = z.object({
   version: z.literal(1), month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
   title: z.string(), expiresAt: z.iso.datetime(), requester: requesterSchema,
+  preview: z.boolean().optional().default(false),
   draft: z.object({ teamKey: z.string(), requesterKey: z.string(), documentDate: z.string(),
     workItems: z.array(expenseWorkItemDraftSchema.extend({ evidenceImage: evidenceImageSchema.extend({ dataUrl: signedUrlSchema }).nullable() })).min(1).max(31) })
 }).superRefine((report, ctx) => {

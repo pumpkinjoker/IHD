@@ -22,6 +22,11 @@ export interface LineStore {
 }
 
 export class SupabaseLineStore implements LineStore {
+  async employeeDetails(employeeId: string) {
+    const params = new URLSearchParams({ employee_id: `eq.${employeeId}`, active: "eq.true", select: "employee_id,name,email,team,position", limit: "1" });
+    const rows = await this.call(`ihd_employee_directory?${params}`, undefined, "GET") as { employee_id: string; name: string; email: string; team: string; position: string }[];
+    return rows[0] ?? null;
+  }
   async employeeEntries(employeeId: string, month: string) {
     const params = new URLSearchParams({ employee_id: `eq.${employeeId}`, select: "id,data",
       and: `(work_date.gte.${month}-01,work_date.lt.${nextMonthStart(month)})`, order: "work_date.asc", limit: "31" });

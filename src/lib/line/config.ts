@@ -7,6 +7,7 @@ import { LocalEvidenceArchive } from "./local-archive";
 import { lineStorageModes } from "./storage-config";
 import { SupabaseEvidenceArchive } from "./supabase-archive";
 import { summaryReply } from "./summary";
+import { summaryLinkReply } from "./summary-link";
 
 /** Keys only, never values; safe for setup diagnostics. No build-time connection. */
 export function missingLineConfiguration(env: NodeJS.ProcessEnv) {
@@ -43,7 +44,10 @@ export function configuredLineReceiver(env: NodeJS.ProcessEnv = process.env) {
     refreshToken: env.GOOGLE_REFRESH_TOKEN!, rootFolderId: env.GOOGLE_DRIVE_ROOT_FOLDER_ID! });
   const store = configuredLineStore(env);
   return createLineReceiver({
-    ...(env.LINE_TEST_SUMMARY_ENABLED === "true" && store instanceof SupabaseLineStore ? { summary: (employee, month, offset, hasDraft) => summaryReply(store, employee, month, offset, hasDraft) } : {}),
+    ...(env.LINE_TEST_SUMMARY_ENABLED === "true" && store instanceof SupabaseLineStore ? {
+      summary: (employee, month, offset, hasDraft) => summaryReply(store, employee, month, offset, hasDraft),
+      summaryLink: (employee, month, hasDraft) => summaryLinkReply(store, env, employee, month, hasDraft)
+    } : {}),
     store,
     line: new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN!), archive,
     employees: (employeeId) => store.findEmployee(employeeId)

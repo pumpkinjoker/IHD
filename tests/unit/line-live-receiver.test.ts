@@ -49,12 +49,12 @@ function postback(data: string, context?: string, userId = "user-1"): LineEvent 
   const event = message("text", "", userId);
   return { ...event, type: "postback", message: undefined, postback: { data: context ? `${data}|${context}` : data } };
 }
-function harness(summary?: ReceiverDependencies["summary"]) {
+function harness(summary?: ReceiverDependencies["summary"], summaryLink?: ReceiverDependencies["summaryLink"]) {
   const line = { reply: vi.fn<(token: string, reply: IntakeReply) => Promise<void>>().mockResolvedValue(undefined),
     image: vi.fn().mockResolvedValue({ bytes: new Uint8Array([255, 216, 255]), mimeType: "image/jpeg" }) };
   const drive = { saveEvidence: vi.fn().mockResolvedValue("drive:file-1"), placeEvidence: vi.fn().mockResolvedValue(undefined) };
   const employees = vi.fn((id: string) => id === employee.employeeId ? employee : null);
-  const receiver = createLineReceiver({ store, line, archive: drive, employees, summary });
+  const receiver = createLineReceiver({ store, line, archive: drive, employees, summary, summaryLink });
   return { line, drive, receiver, employees };
 }
 async function register(h: ReturnType<typeof harness>) {
@@ -83,6 +83,16 @@ beforeEach(async () => {
 afterAll(async () => { await db?.close(); });
 
 describe("real LINE processing with durable SQL transactions", () => {
+  it("requests an owned summary link without clearing the draft", async () => {
+    const link = vi.fn<NonNullable<ReceiverDependencies["summaryLink"]>>().mockResolvedValue({ text: "ลิงก์ส่วนตัว", buttons: [{ label: "กลับรายการที่ค้าง", data: "intake:resume" }] });
+    const h = harness(undefined, link);
+    await prepare(h);
+    await h.receiver.receive([message("text", "ขอลิงก์สรุป")]);
+    expect(link).toHaveBeenCalledWith(employee, "2026-10", true);
+    const state = (await db.query<{ state: { conversation: { intake: { step: string; draft: { subject: string } } } } }>("select state from public.line_sessions where user_id='user-1'")).rows[0].state;
+    expect(state.conversation.intake).toMatchObject({ step: "review", draft: { subject: "ถ่ายทำ" } });
+    expect((await db.query("select * from public.line_work_entries")).rows).toHaveLength(0);
+  });
   it("opens the test summary from a scoped button without changing an unfinished work item", async () => {
     const summary = vi.fn<NonNullable<ReceiverDependencies["summary"]>>().mockResolvedValue({ text: "สรุปตารางทดสอบ", buttons: [{ label: "กลับรายการที่ค้าง", data: "intake:resume" }] });
     const h = harness(summary);

@@ -20,7 +20,7 @@ describe("test LINE summary table", () => {
     expect(reply.table?.rows).toHaveLength(5);
     expect(reply.table?.total).toBe("1,950.00");
     expect(reply.table?.note).toContain("2,050.00");
-    expect(reply.buttons.map((button) => button.data)).toEqual(["summary:2026-10:5", "intake:resume"]);
+    expect(reply.buttons.map((button) => button.data)).toEqual(["summary:2026-10:5", "summary-link:2026-10", "intake:resume"]);
     const next = await summaryReply(store, employee, "2026-10", 5, false);
     expect(next.table?.rows[0].amount).toBe("450.00");
     const message = toLineMessage(reply);

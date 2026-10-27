@@ -383,3 +383,11 @@ An explicit month is accepted as `ดูสรุปตาราง YYYY-MM`. Bu
 per-conversation context checks as the existing intake menus. Turn the flag off
 after testing. The sample Flex payload was validated with LINE's validation API,
 without sending any test messages to real employees.
+
+The test table also offers **ขอลิงก์สรุป** (or type that command directly).
+This creates a private web preview for the bound employee and selected month,
+with signed evidence URLs and a lifetime of at most 24 hours. The page marks it
+as a test preview and supports Save as PDF. Preview JSON is tracked separately
+in `line_summary_previews`, so it cannot replace or suppress the final monthly
+outbox. The existing cleanup deletes expired preview objects and registry rows
+at the start of the third month. No public table access is granted.

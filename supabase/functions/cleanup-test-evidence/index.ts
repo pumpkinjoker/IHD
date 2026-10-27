@@ -62,6 +62,13 @@ export async function cleanupTestEvidence(request: Request, env: { url: string; 
       reportsRemoved += reports.length;
       if (reports.length < 10) break;
     }
+    while (Date.now() < deadline) {
+      const previews = await (await api(`rest/v1/line_summary_previews?${new URLSearchParams({ select: "employee_id,period,object_path", period: `lt.${cutoff}`, limit: "100" })}`)).json() as { employee_id: string; period: string; object_path: string }[];
+      if (!previews.length) break;
+      await api("storage/v1/object/ihd-monthly-reports", "DELETE", { prefixes: previews.map((preview) => preview.object_path) });
+      await api(`rest/v1/line_summary_previews?${new URLSearchParams({ object_path: `in.(${previews.map((preview) => preview.object_path).join(",")})`, period: `lt.${cutoff}` })}`, "DELETE");
+      if (previews.length < 100) break;
+    }
     return json({ cutoff, removed, entriesRemoved, eventsRemoved, reportsRemoved });
   } catch { return json({ error: "Cleanup failed; safe to retry", removed }, 503); }
   finally { if (locked) await api("rest/v1/rpc/line_release_media", "POST", { p_lease: lease }).catch(() => undefined); }

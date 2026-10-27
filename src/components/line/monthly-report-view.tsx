@@ -30,6 +30,7 @@ export function MonthlyReportView() {
   return <main className="expense-preview-screen monthly-report-screen">
     <section className="no-print mx-auto max-w-4xl space-y-3 px-6 py-6">
       <h1 className="text-2xl font-semibold">{report.title}</h1>
+      {report.preview && <p className="font-medium">สรุปช่วงทดสอบ ณ ตอนเรียกดู · ยังไม่ใช่รายงานปิดเดือน</p>}
       <p>{report.requester.name} ({report.requester.employeeId})</p>
       <p>{report.draft.workItems.length} วัน · รวม {formatMoney(calculateGrandTotal(report.draft.workItems))} บาท</p>
       <p className="text-sm">ข้อมูลสรุป ณ วันออกเอกสาร · ลิงก์ส่วนตัวนี้หมดอายุพร้อมรอบล้างข้อมูล กรุณาเก็บ PDF ไว้ก่อนถึงกำหนด</p>

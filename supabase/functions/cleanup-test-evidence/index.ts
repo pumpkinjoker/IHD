@@ -28,6 +28,7 @@ export async function cleanupTestEvidence(request: Request, env: { url: string; 
   let removed = 0;
   let entriesRemoved = 0;
   let eventsRemoved = 0;
+  let reportsRemoved = 0;
   try {
     const { dryRun = false } = await request.json().catch(() => ({}));
     locked = await (await api("rest/v1/rpc/line_claim_media", "POST", { p_lease: lease })).json();
@@ -51,7 +52,17 @@ export async function cleanupTestEvidence(request: Request, env: { url: string; 
       removed += rows.length;
       if (rows.length < 100) { await purge([]); break; }
     }
-    return json({ cutoff, removed, entriesRemoved, eventsRemoved });
+    // Monthly snapshots (including copied evidence) expire with their work month.
+    while (Date.now() < deadline) {
+      const reports = await (await api(`rest/v1/line_monthly_reports?${new URLSearchParams({ select: "id,object_paths", period: `lt.${cutoff}`, order: "period.asc,id.asc", limit: "10" })}`)).json() as { id: string; object_paths: string[] }[];
+      if (!reports.length) break;
+      const paths = reports.flatMap((report) => report.object_paths);
+      if (paths.length) await api("storage/v1/object/ihd-monthly-reports", "DELETE", { prefixes: paths });
+      await api(`rest/v1/line_monthly_reports?${new URLSearchParams({ id: `in.(${reports.map((report) => report.id).join(",")})`, period: `lt.${cutoff}` })}`, "DELETE");
+      reportsRemoved += reports.length;
+      if (reports.length < 10) break;
+    }
+    return json({ cutoff, removed, entriesRemoved, eventsRemoved, reportsRemoved });
   } catch { return json({ error: "Cleanup failed; safe to retry", removed }, 503); }
   finally { if (locked) await api("rest/v1/rpc/line_release_media", "POST", { p_lease: lease }).catch(() => undefined); }
 }

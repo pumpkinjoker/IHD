@@ -220,8 +220,8 @@ Implemented behavior and remaining integration requirements:
    close and retry jobs need unique employee/period/version delivery keys and
    reconciliation for ambiguous email-provider timeouts.
 
-Final cutoff/send time, email sender, missing-data handling and approval policy
-are not confirmed yet. No monthly schedule is created by this preparation.
+The monthly LINE-link schedule is now configured as described below. Direct email
+from the requested inhouse.mkt@toagroup.com account still requires mail authorization.
 
 ## Operational limits before rollout
 
@@ -332,3 +332,41 @@ Regular tests are offline. Opt-in cloud verification:
 `IHD_STORAGE_SMOKE=1 node --env-file=.env.local node_modules/vitest/vitest.mjs run tests/unit/supabase-storage-live.test.ts`.
 It creates temporary isolated fixtures, verifies upload/read/edit/LINE commit,
 dry-runs cleanup, and removes its own fixtures without sending LINE messages.
+
+### Monthly LINE summary delivery
+
+`monthly-report-worker` runs through Supabase Cron job
+`ihd-monthly-personal-reports`: day 1, 08:00 Bangkok, with five-minute retries
+until 09:55 for pending recipients. It selects the previous calendar month.
+People with no work are skipped. A recipient needs exactly one real LINE user
+association; absent/ambiguous recipients are recorded as blocked. Browser test
+identities are excluded. Association and active status are rechecked before push.
+
+Reports snapshot each employee's directory data, entries and evidence copies in
+the private `ihd-monthly-reports` bucket. Unsaved amounts use the agreed 300 baht
+per day; amounts saved through the original form take precedence. The signed
+summary URL is placed in the fragment of `/line/monthly`, so Vercel does not need
+new server credentials to serve this read-only page. It validates the Storage
+origin, bucket, signed assets, employee and month before rendering.
+
+The page reuses the existing expense and evidence components and requester
+snapshot. Save as PDF uses the browser print dialog. Long monthly tables flow
+onto additional print pages without dropping rows or signature fields.
+
+`line_monthly_reports` is a server-only outbox with a unique month/employee key,
+leased jobs, frozen message text and a persisted LINE retry UUID. A successful
+send is never repeated. Ambiguous retries stop before LINE's 24-hour retry-key
+window; such rows need reconciliation, not a fresh automatic send. Last errors
+store generic codes without provider response bodies or credentials.
+
+The LINE token is held in Vault as `ihd_monthly_line_token`; the existing
+`ihd_test_evidence_service_key` authenticates Cron. Both functions keep gateway
+JWT verification and service-role checks. No public table grants are added.
+Report JSON, image copies and outbox rows are deleted with the original work
+month by the existing cleanup task. January summaries expire on March 1.
+
+The requested mail sender is inhouse.mkt@toagroup.com, with the subject
+“สรุปยอดเบิกเบี้ยเลี้ยงเดือน…”. Sending email from that account is not enabled:
+no SMTP, OAuth or mail provider has been authorized. The user chose the LINE
+web-summary fallback. No real employee messages are sent by QA; the cloud smoke
+test intercepts LINE transport and removes all of its temporary objects and rows.

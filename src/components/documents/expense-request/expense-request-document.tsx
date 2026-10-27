@@ -3,6 +3,7 @@ import { findRequesterByKey, masterData } from "@/lib/master-data";
 import { formatMoney } from "@/lib/money/format-money";
 import { toThaiBahtText } from "@/lib/money/thai-baht-text";
 import type { ExpenseRequestForm } from "@/types/expense-request";
+import type { TeamMember } from "@/types/master-data";
 import { CompanyHeader } from "./company-header";
 import { DocumentPage } from "./document-page";
 import { EntertainmentSection } from "./entertainment-section";
@@ -13,10 +14,11 @@ import { SignatureSection } from "./signature-section";
 
 type ExpenseRequestDocumentProps = {
   draft: ExpenseRequestForm;
+  requesterOverride?: TeamMember;
 };
 
-export function ExpenseRequestDocument({ draft }: ExpenseRequestDocumentProps) {
-  const requester = findRequesterByKey(draft.requesterKey);
+export function ExpenseRequestDocument({ draft, requesterOverride }: ExpenseRequestDocumentProps) {
+  const requester = requesterOverride ?? findRequesterByKey(draft.requesterKey);
   const grandTotal = calculateGrandTotal(draft.workItems);
   const grandTotalText = formatMoney(grandTotal);
 

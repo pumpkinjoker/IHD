@@ -78,8 +78,8 @@ The signed webhook at `/api/line/webhook` now has a configurable Supabase-backed
 receiver, persistent employee association, LINE replies and a private Google Drive
 archive. It is disabled by default until credentials and the SQL migration are
 configured. This test instance now uses Supabase project IHD for its database and
-stores photos in the private `ihd-evidence-test` Supabase bucket; the OA reaches this computer through a temporary tunnel. Google Sheets directory
-sync, email delivery and monthly scheduling are not implemented yet.
+stores photos in the private `ihd-evidence-test` Supabase bucket; the OA reaches this computer through a temporary tunnel. Google Sheets directory sync and email delivery are not implemented yet. Monthly
+LINE summaries are scheduled for the first day at 08:00 Bangkok; see below.
 See [LINE setup and remaining integration work](docs/line-intake-setup.md).
 
 The active test setup uses `LINE_DATABASE_MODE=supabase` and
@@ -115,3 +115,14 @@ With `LINE_INTAKE_ENABLED=true` and LINE credentials present, the signed webhook
 also uses these local adapters. LINE still requires an externally reachable HTTPS
 URL to call a local server; no tunnel is created automatically. Local mode is
 blocked on Vercel. The original `/line/simulator` remains an in-memory demo.
+
+### Monthly personal summaries
+
+On the first day at 08:00 Bangkok, the bot sends each linked employee with work
+in the previous month a private summary link. The page reuses the real expense
+form and supporting evidence, with browser Save as PDF. Unedited LINE entries
+use 300 baht per day; saved web amounts override it. Reports and copied images
+expire with their work month at the start of the third month.
+
+Email from `inhouse.mkt@toagroup.com` is not connected. The agreed fallback is
+the private LINE summary link, not an automatically attached PDF or sent email.

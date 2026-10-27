@@ -1,4 +1,13 @@
+.monthly-report-screen .expense-request-page:not(.supporting-evidence-page) {
+  height: auto;
+  min-height: 297mm;
+}
+
 @media print {
+  .monthly-report-screen .expense-table tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
   @page {
     size: A4;
     margin: 0;

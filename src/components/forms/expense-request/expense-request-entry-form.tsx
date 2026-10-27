@@ -436,6 +436,7 @@ export function ExpenseRequestEntryForm() {
   const [isRestored, setIsRestored] = useState(false);
   const [cloudScope, setCloudScope] = useState<{ employeeId: string; month: string; reportToken?: string } | null>(null);
   const month = cloudScope?.month ?? bangkokDate(new Date()).slice(0, 7);
+  const monthLabel = new Intl.DateTimeFormat("th-TH", { month: "long", year: "numeric", timeZone: "Asia/Bangkok" }).format(new Date(`${month}-01T00:00:00+07:00`));
   const [cloudBusy, setCloudBusy] = useState(false);
   const [cloudMessage, setCloudMessage] = useState("");
   const form = useForm<ExpenseRequestForm>({
@@ -693,7 +694,7 @@ export function ExpenseRequestEntryForm() {
         </div>
 
         <div className="mt-5 flex flex-wrap items-center gap-3">
-          <p className="text-sm text-muted-foreground">รายการเดือน {month}</p>
+          <p className="text-sm text-muted-foreground">รายการเดือน{monthLabel}</p>
           <Button disabled={!selectedRequester || !month || Boolean(cloudScope)} onClick={() => void loadCloud()} variant="outline">เปิดรายการที่บันทึกไว้</Button>
           {cloudScope && <Button variant="ghost" onClick={() => { try { sessionStorage.removeItem(CLOUD_SCOPE_KEY); } catch {} window.history.replaceState(null, "", window.location.pathname); setCloudScope(null); setCloudMessage(""); setValue("workItems", [createDefaultExpenseWorkItem()]); }}>เปลี่ยนผู้ขอเบิก</Button>}
         </div>

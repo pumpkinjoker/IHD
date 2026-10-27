@@ -55,9 +55,9 @@ export function toLineMessage(reply: IntakeReply) {
       contents: { type: "bubble", size: "mega", body: { type: "box", layout: "vertical", paddingAll: "16px", spacing: "8px", contents: [
         { type: "box", layout: "vertical", spacing: "2px", contents: [text(table.title, { size: "16px", weight: "bold" }), text(table.subtitle, { color: "#666666" })] },
         { type: "separator" },
-        { type: "box", layout: "horizontal", spacing: "sm", margin: "14px", contents: [column("วันที่", "36px", { weight: "bold", wrap: false }), text("รายการ / สถานที่", { flex: 1, weight: "bold", wrap: false }), column("เบี้ยเลี้ยง", "76px", { align: "end", weight: "bold", wrap: false })] },
+        { type: "box", layout: "horizontal", spacing: "sm", margin: "14px", contents: [column("วันที่", "48px", { weight: "bold", wrap: false }), text("รายการ / สถานที่", { flex: 1, weight: "bold", wrap: false }), column("เบี้ยเลี้ยง", "76px", { align: "end", weight: "bold", wrap: false })] },
         { type: "box", layout: "vertical", spacing: "16px", margin: "0px", contents: table.rows.map((row) => ({ type: "box", layout: "horizontal", spacing: "sm", contents: [
-          column(row.date, "36px", { wrap: false, compact: true }),
+          column(row.date, "48px", { wrap: false, compact: true }),
           { type: "box", layout: "vertical", flex: 1, spacing: "none", contents: [text(row.subject, { compact: true }), text(row.location, { color: "#777777", compact: true })] },
           column(row.amount, "76px", { align: "end", wrap: false, compact: true })
         ] })) },

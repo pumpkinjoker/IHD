@@ -131,7 +131,6 @@ export function createLineReceiver(deps: ReceiverDependencies): DurableLineRecei
             } else await deps.archive.placeEvidence(result.entry.imageId, result.state.employee!, result.entry.workDate);
           }
           const buttons = [...result.reply.buttons];
-          if (!recordRequest && result.state.employee && result.state.intake.step === "idle") buttons.push({ label: "ดูรายการ", data: `records:${bangkokDate(now).slice(0, 7)}:0` });
           const summaryData = `summary:${linkRequest?.month || summaryRequest?.month || recordRequest?.month || month}:0`;
           if (deps.summary && result.state.employee && result.state.onboarding === "idle" && !buttons.some((button) => button.data === summaryData) && (menuRequest || summaryRequest || recordRequest || result.state.intake.step === "idle" || (result.state.intake.step === "photo" && !result.state.intake.draft?.imageId))) {
             buttons.push({ label: "ดูสรุปตาราง", data: summaryData });

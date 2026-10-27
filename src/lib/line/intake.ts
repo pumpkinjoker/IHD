@@ -25,7 +25,10 @@ export type IntakeAction =
   | { type: "unsupported" };
 
 export type IntakeButton = { label: string; data: string };
-export type IntakeReply = { text: string; buttons: IntakeButton[] };
+export type IntakeReply = {
+  text: string; buttons: IntakeButton[];
+  table?: { title: string; subtitle: string; rows: { date: string; subject: string; location: string; amount: string }[]; total: string; note: string };
+};
 export type IntakeResult = {
   state: IntakeState;
   reply: IntakeReply;

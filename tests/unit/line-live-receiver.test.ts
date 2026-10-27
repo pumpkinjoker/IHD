@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { createLineReceiver } from "@/lib/line/receiver";
+import { createLineReceiver, type ReceiverDependencies } from "@/lib/line/receiver";
 import { SupabaseLineStore } from "@/lib/line/store";
 import { LineMediaRejected, LineReplyRejected } from "@/lib/line/client";
 import type { LineEvent } from "@/lib/line/webhook";
@@ -49,12 +49,12 @@ function postback(data: string, context?: string, userId = "user-1"): LineEvent 
   const event = message("text", "", userId);
   return { ...event, type: "postback", message: undefined, postback: { data: context ? `${data}|${context}` : data } };
 }
-function harness() {
+function harness(summary?: ReceiverDependencies["summary"]) {
   const line = { reply: vi.fn<(token: string, reply: IntakeReply) => Promise<void>>().mockResolvedValue(undefined),
     image: vi.fn().mockResolvedValue({ bytes: new Uint8Array([255, 216, 255]), mimeType: "image/jpeg" }) };
   const drive = { saveEvidence: vi.fn().mockResolvedValue("drive:file-1"), placeEvidence: vi.fn().mockResolvedValue(undefined) };
   const employees = vi.fn((id: string) => id === employee.employeeId ? employee : null);
-  const receiver = createLineReceiver({ store, line, archive: drive, employees });
+  const receiver = createLineReceiver({ store, line, archive: drive, employees, summary });
   return { line, drive, receiver, employees };
 }
 async function register(h: ReturnType<typeof harness>) {
@@ -83,6 +83,21 @@ beforeEach(async () => {
 afterAll(async () => { await db?.close(); });
 
 describe("real LINE processing with durable SQL transactions", () => {
+  it("opens the test summary from a scoped button without changing an unfinished work item", async () => {
+    const summary = vi.fn<NonNullable<ReceiverDependencies["summary"]>>().mockResolvedValue({ text: "สรุปตารางทดสอบ", buttons: [{ label: "กลับรายการที่ค้าง", data: "intake:resume" }] });
+    const h = harness(summary);
+    await prepare(h);
+    await h.receiver.receive([message("text", "เมนู")]);
+    const button = h.line.reply.mock.calls.at(-1)![1].buttons.find((button) => button.label === "ดูสรุปตาราง")!;
+    await h.receiver.receive([postback(button.data)]);
+    expect(summary).toHaveBeenCalledWith(employee, "2026-10", 0, true);
+    const session = (await db.query<{ state: { conversation: { intake: { step: string; draft: { subject: string } } } } }>("select state from public.line_sessions where user_id='user-1'")).rows[0];
+    expect(session.state.conversation.intake).toMatchObject({ step: "review", draft: { subject: "ถ่ายทำ" } });
+    await h.receiver.receive([postback(button.data)]);
+    expect(summary).toHaveBeenCalledOnce();
+    expect(h.line.reply.mock.calls.at(-1)![1].text).toContain("ขั้นตอนก่อนหน้า");
+    expect((await db.query("select * from public.line_work_entries")).rows).toHaveLength(0);
+  });
   it("accepts and confirms a Supabase image reference from the real archive contract", async () => {
     const h = harness();
     const reference = `supabase:${"a".repeat(64)}`;

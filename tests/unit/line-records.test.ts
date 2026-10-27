@@ -14,6 +14,7 @@ describe("compact review and record lookup", () => {
     const message = toLineMessage({ ...review.reply, buttons: review.reply.buttons.map((button) => ({ ...button, data: `${button.data}|context` })) });
     expect(message.type).toBe("flex");
     if (message.type !== "flex") throw new Error("Expected Flex");
+    if (!message.contents.footer) throw new Error("Expected review footer");
     expect(message.contents.size).toBe("mega");
     expect(message.contents.footer.contents).toHaveLength(2);
     expect(message.contents.footer.contents[0]).toMatchObject({ style: "primary", height: "sm" });

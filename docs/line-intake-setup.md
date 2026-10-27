@@ -370,3 +370,16 @@ The requested mail sender is inhouse.mkt@toagroup.com, with the subject
 no SMTP, OAuth or mail provider has been authorized. The user chose the LINE
 web-summary fallback. No real employee messages are sent by QA; the cloud smoke
 test intercepts LINE transport and removes all of its temporary objects and rows.
+
+### Test-only LINE summary button
+
+Set `LINE_TEST_SUMMARY_ENABLED=true` on the webhook server using the Supabase
+store. Type **เมนู** or **ดูสรุปตาราง** in the OA to see the test summary button.
+The Flex table shows the bound employee's confirmed entries in the current
+Bangkok month: date, subject/location, daily allowance and the complete month's
+allowance total. Saved web amounts override the 300/day default. Five rows are
+shown per page; current drafts and the real monthly delivery remain unchanged.
+An explicit month is accepted as `ดูสรุปตาราง YYYY-MM`. Buttons use the same
+per-conversation context checks as the existing intake menus. Turn the flag off
+after testing. The sample Flex payload was validated with LINE's validation API,
+without sending any test messages to real employees.

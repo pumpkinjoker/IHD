@@ -9,8 +9,10 @@ import { eventToIntakeAction, type LineEvent } from "./webhook";
 import type { LineStore } from "./store";
 import type { DurableLineReceiver } from "./webhook-handler";
 import { parseRecordCommand, parseRecordPostback, recordReply } from "./records";
+import { parseSummaryCommand, parseSummaryPostback } from "./summary";
 
 export type ReceiverDependencies = {
+  summary?: (employee: IntakeEmployee, month: string, offset: number, hasDraft: boolean) => Promise<IntakeReply>;
   store: LineStore;
   employees: EmployeeLookup;
   line: {
@@ -60,12 +62,16 @@ export function createLineReceiver(deps: ReceiverDependencies): DurableLineRecei
         try {
           const current = claim.state?.conversation ?? INITIAL_EMPLOYEE_INTAKE_STATE;
           const now = new Date(event.timestamp);
+          const month = bangkokDate(now).slice(0, 7);
+          const menuRequest = Boolean(deps.summary && current.employee && action.type === "text" && action.text.trim() === "เมนู");
+          let summaryRequest = deps.summary && action.type === "text" && current.employee && current.onboarding === "idle" ? parseSummaryCommand(action.text, month) : null;
           let staleButton = false;
           let recordRequest = action.type === "text" && current.employee &&
             ["idle", "review"].includes(current.intake.step) ? parseRecordCommand(action.text, bangkokDate(now).slice(0, 7)) : null;
           if (event.type === "postback" && event.postback) {
             const [data, context] = event.postback.data.split("|");
             recordRequest = parseRecordPostback(data);
+            summaryRequest = deps.summary ? parseSummaryPostback(data) : null;
             // Only an unscoped Start command is allowed from the permanent menu.
             staleButton = data !== "intake:start" && (!context || context !== claim.state?.buttonContext);
             action = eventToIntakeAction({ ...event, postback: { data } })!;
@@ -101,6 +107,11 @@ export function createLineReceiver(deps: ReceiverDependencies): DurableLineRecei
             state: current,
             reply: { text: "ปุ่มนี้เป็นของขั้นตอนก่อนหน้า กรุณาทำขั้นตอนปัจจุบันต่อ หรือยกเลิกเพื่อเริ่มใหม่ครับ",
               buttons: [{ label: "ยกเลิก", data: "intake:cancel" }] }
+          } : summaryRequest && current.employee && deps.summary ? {
+            state: current,
+            reply: await deps.summary(current.employee, summaryRequest.month, summaryRequest.offset, current.intake.step !== "idle")
+          } : menuRequest ? {
+            state: current, reply: { text: "เลือกเมนูได้เลยครับ รายการที่กำลังกรอกยังอยู่เหมือนเดิม", buttons: [current.intake.step !== "idle" ? { label: "กลับรายการที่ค้าง", data: "intake:resume" } : { label: "เพิ่มข้อมูลหน้างาน", data: "intake:start" }] }
           } : recordRequest && current.employee ? {
             state: current,
             reply: recordReply(await deps.store.listEntries(event.source.userId, current.employee.employeeId, recordRequest.month, recordRequest.offset),
@@ -115,6 +126,9 @@ export function createLineReceiver(deps: ReceiverDependencies): DurableLineRecei
           }
           const buttons = [...result.reply.buttons];
           if (!recordRequest && result.state.employee && result.state.intake.step === "idle") buttons.push({ label: "ดูรายการ", data: `records:${bangkokDate(now).slice(0, 7)}:0` });
+          if (deps.summary && result.state.employee && result.state.onboarding === "idle" && (menuRequest || summaryRequest || recordRequest || result.state.intake.step === "idle" || (result.state.intake.step === "photo" && !result.state.intake.draft?.imageId))) {
+            buttons.push({ label: "ดูสรุปตาราง", data: `summary:${month}:0` });
+          }
           const reply: IntakeReply = {
             ...result.reply,
             buttons: buttons.map((button) => ({ ...button, data: `${button.data}|${event.webhookEventId}` }))

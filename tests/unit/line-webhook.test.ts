@@ -70,6 +70,7 @@ describe("LINE webhook boundary", () => {
     const message = toLineMessage({ text: "ทดสอบ", buttons: [{ label: "ใช้แล้วข้อมูลถูกต้องเวรี่กู้ด", data: "intake:confirm" }] });
     expect(message.type).toBe("flex");
     if (message.type !== "flex") throw new Error("Expected a Flex message");
+    if (!message.contents.footer) throw new Error("Expected review footer");
     expect(message.contents.footer.contents[0]).toMatchObject({ action: { type: "postback", data: "intake:confirm", label: "ใช้แล้วข้อมูลถูกต้องเวรี่กู้ด" } });
   });
 });

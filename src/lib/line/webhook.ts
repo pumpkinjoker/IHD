@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { parseEmployeeIntakePostback, type EmployeeIntakeAction } from "./employee-intake";
+import type { IntakeReply } from "./intake";
 
 const sourceSchema = z.object({ type: z.string(), userId: z.string().optional() });
 const eventSchema = z.object({
@@ -35,7 +36,27 @@ export function eventToIntakeAction(event: LineEvent): EmployeeIntakeAction | nu
 }
 
 /** LINE message format; same buttons as the simulator. */
-export function toLineMessage(reply: { text: string; buttons: { label: string; data: string }[] }) {
+export function toLineMessage(reply: IntakeReply) {
+  if (reply.table) {
+    const table = reply.table;
+    const text = (value: string, extra: Record<string, unknown> = {}) => ({ type: "text", text: value || "—", size: "xs", wrap: true, ...extra });
+    const column = (value: string, width: string, extra: Record<string, unknown> = {}) => ({ type: "box", layout: "vertical", width, flex: 0, contents: [text(value, extra)] });
+    return {
+      type: "flex" as const, altText: reply.text.slice(0, 400),
+      contents: { type: "bubble", size: "mega", body: { type: "box", layout: "vertical", paddingAll: "12px", spacing: "sm", contents: [
+        text(table.title, { size: "md", weight: "bold" }), text(table.subtitle, { color: "#666666" }),
+        { type: "separator" },
+        { type: "box", layout: "horizontal", spacing: "sm", contents: [column("วันที่", "42px", { weight: "bold" }), text("งาน / สถานที่", { flex: 1, weight: "bold" }), column("เบี้ยเลี้ยง", "65px", { align: "end", weight: "bold" })] },
+        ...table.rows.map((row) => ({ type: "box", layout: "horizontal", spacing: "sm", contents: [
+          column(row.date, "42px"),
+          { type: "box", layout: "vertical", flex: 1, contents: [text(row.subject, { maxLines: 2 }), text(row.location, { size: "xxs", color: "#777777", maxLines: 1 })] },
+          column(row.amount, "65px", { align: "end" })
+        ] })),
+        { type: "separator" }, text(`เบี้ยเลี้ยงรวมทั้งเดือน ${table.total} บาท`, { weight: "bold" }), text(table.note, { size: "xxs", color: "#666666" })
+      ] } },
+      ...(reply.buttons.length ? { quickReply: { items: reply.buttons.map((button) => ({ type: "action", action: { type: "postback", label: button.label, data: button.data, displayText: button.label } })) } } : {})
+    };
+  }
   // Quick reply labels allow 20 characters; Flex buttons allow 40. Preserve the
   // user's chosen long confirmation wording rather than truncating it.
   if (reply.buttons.some((button) => button.label.length > 20)) {

@@ -18,6 +18,8 @@ const request = (body?: unknown) => new Request("http://127.0.0.1:3000/api/expen
 const item = () => ({ ...createDefaultExpenseWorkItem(), id: row.id, workDate: entry.workDate, subject: "แก้ไขจากเว็บ", location: entry.location, evidenceImage: { fileName: "old.png", mimeType: "image/png", dataUrl: `data:image/png;base64,${png.toString("base64")}` } });
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-27T01:00:00Z"));
   vi.stubEnv("NODE_ENV", "development"); vi.stubEnv("LINE_MEDIA_MODE", "local"); vi.stubEnv("VERCEL", "");
   rows = [row]; failUpdate = false; updateBody = undefined;
   const transport: typeof fetch = async (url, init) => {
@@ -39,7 +41,7 @@ beforeEach(() => {
   vi.spyOn(LocalEvidenceArchive.prototype, "readEvidence").mockResolvedValue({ bytes: png, mimeType: "image/png" });
   vi.spyOn(LocalEvidenceArchive.prototype, "editEvidence").mockResolvedValue({ rollback, commit });
 });
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); vi.clearAllMocks(); });
+afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllEnvs(); vi.clearAllMocks(); });
 
 describe("original expense form data API", () => {
   it("keeps text and costs editable after monthly image expiry", async () => {
@@ -61,6 +63,13 @@ describe("original expense form data API", () => {
     const { items } = await response.json();
     expect(items[0]).toMatchObject({ id: row.id, subject: entry.subject, perDiem: 300, evidenceImage: { fileName: "20261026.png" } });
     expect(JSON.stringify(items)).not.toContain("server-only");
+  });
+  it("derives the Bangkok month on the server and rejects cross-month reads and writes", async () => {
+    expect((await GET(new Request("http://127.0.0.1:3000/api/expense-records?employeeId=12345678&month=2026-09"))).status).toBe(400);
+    const result = await GET(new Request("http://127.0.0.1:3000/api/expense-records?employeeId=12345678"));
+    expect((await result.json()).month).toBe("2026-10");
+    expect((await POST(request({ employeeId: entry.employeeId, month: "2026-09", item: { ...item(), workDate: "2026-09-26" } }))).status).toBe(400);
+    expect(LocalEvidenceArchive.prototype.editEvidence).not.toHaveBeenCalled();
   });
   it("updates the same LINE entry and stores amounts without base64 in the database", async () => {
     const response = await POST(request({ employeeId: entry.employeeId, month: "2026-10", item: { ...item(), fare: 200 } }));
@@ -84,7 +93,9 @@ describe("original expense form data API", () => {
   });
   it("rejects requests outside the local testing environment", async () => {
     vi.stubEnv("NODE_ENV", "production");
-    expect((await GET(request())).status).toBe(404);
-    expect((await POST(request({}))).status).toBe(404);
+    const response = await GET(request());
+    expect(response.status).toBe(503);
+    expect((await response.json()).error).toContain("ฐานข้อมูล");
+    expect((await POST(request({}))).status).toBe(503);
   });
 });

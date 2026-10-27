@@ -9,22 +9,25 @@ import { createDefaultExpenseWorkItem } from "@/lib/expense-request/form-default
 import { evidenceFileName } from "@/lib/images/evidence-file-name";
 import { expenseWorkItemSchema } from "@/schemas/expense-request-form.schema";
 import type { EvidenceImage } from "@/types/expense-request";
+import { bangkokDate } from "@/lib/line/intake";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-const scopeSchema = z.object({ employeeId: z.string().regex(/^\d{8}$/), month: z.string().refine(validMonth) });
+const scopeSchema = z.object({ employeeId: z.string().regex(/^\d{8}$/), month: z.string().refine(validMonth).optional() });
 const json = (data: unknown, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
 
 export async function GET(request: Request) {
-  if (!allowsExpenseRecords(request)) return new Response(null, { status: 404 });
+  if (!allowsExpenseRecords(request)) return json({ error: "เว็บยังไม่พร้อมเชื่อมฐานข้อมูล กรุณาติดต่อผู้ดูแล" }, 503);
   const scope = scopeSchema.safeParse(Object.fromEntries(new URL(request.url).searchParams));
-  if (!scope.success) return json({ error: "กรุณาเลือกพนักงานและเดือน" }, 400);
+  if (!scope.success) return json({ error: "กรุณาเลือกพนักงาน" }, 400);
+  const month = bangkokDate(new Date()).slice(0, 7);
+  if (scope.data.month && scope.data.month !== month) return json({ error: "เปิดรายการได้เฉพาะเดือนปัจจุบัน" }, 400);
   try {
     const store = configuredLineStore();
     if (!(store instanceof SupabaseLineStore)) return json({ error: "ยังไม่ได้เชื่อม Supabase" }, 503);
     const employee = await store.findEmployee(scope.data.employeeId);
     if (!employee?.active) return json({ error: "ไม่พบพนักงาน" }, 404);
-    const rows = await store.employeeEntries(employee.employeeId, scope.data.month);
+    const rows = await store.employeeEntries(employee.employeeId, month);
     const archive = configuredEvidenceArchive();
     const items = [];
     for (const row of rows) {
@@ -44,12 +47,12 @@ export async function GET(request: Request) {
       items.push({ ...createDefaultExpenseWorkItem(), ...row.data.expense, id: row.id,
         workDate: row.data.workDate, subject: row.data.subject, location: row.data.location, evidenceImage, evidenceExpired });
     }
-    return json({ items });
+    return json({ items, month });
   } catch { return json({ error: "โหลดรายการหรือรูปไม่สำเร็จ กรุณาลองอีกครั้ง" }, 503); }
 }
 
 export async function POST(request: Request) {
-  if (!allowsExpenseRecords(request)) return new Response(null, { status: 404 });
+  if (!allowsExpenseRecords(request)) return json({ error: "เว็บยังไม่พร้อมเชื่อมฐานข้อมูล กรุณาติดต่อผู้ดูแล" }, 503);
   const store = configuredLineStore();
   if (!(store instanceof SupabaseLineStore)) return json({ error: "ยังไม่ได้เชื่อม Supabase" }, 503);
   let lease: string | undefined;
@@ -70,8 +73,9 @@ export async function POST(request: Request) {
     } finally { await reader.cancel(); }
     const parsed = scopeSchema.extend({ item: expenseWorkItemSchema }).safeParse(JSON.parse(Buffer.concat(chunks).toString("utf8")));
     if (!parsed.success) return json({ error: "กรุณาตรวจสอบข้อมูลและรูปหลักฐาน" }, 400);
-    const { employeeId, month, item } = parsed.data;
-    if (!item.workDate.startsWith(`${month}-`) || new Date(`${item.workDate}T00:00:00Z`).toISOString().slice(0, 10) !== item.workDate) return json({ error: "วันที่ต้องอยู่ในเดือนที่เลือก" }, 400);
+    const { employeeId, item } = parsed.data;
+    const month = bangkokDate(new Date()).slice(0, 7);
+    if ((parsed.data.month && parsed.data.month !== month) || !item.workDate.startsWith(`${month}-`) || new Date(`${item.workDate}T00:00:00Z`).toISOString().slice(0, 10) !== item.workDate) return json({ error: "วันที่ต้องอยู่ในเดือนปัจจุบัน" }, 400);
     lease = randomUUID();
     if (!await store.claimMedia(lease)) { lease = undefined; return json({ error: "กำลังบันทึกรายการอื่น กรุณาลองใหม่" }, 409); }
     const [employee, rows] = await Promise.all([store.findEmployee(employeeId), store.employeeEntries(employeeId, month)]);

@@ -3,6 +3,7 @@ import { evidenceFileName } from "@/lib/images/evidence-file-name";
 import { bangkokDate, type IntakeReply } from "./intake";
 import type { IntakeEmployee } from "./employee-intake";
 import type { SupabaseLineStore } from "./store";
+import { randomBytes, createHash } from "node:crypto";
 
 type Store = Pick<SupabaseLineStore, "employeeEntries" | "employeeDetails">;
 export async function summaryLinkReply(store: Store, env: Record<string, string | undefined>, employee: IntakeEmployee, month: string, hasDraft: boolean, request: typeof fetch = fetch, now = new Date()): Promise<IntakeReply> {
@@ -44,7 +45,9 @@ export async function summaryLinkReply(store: Store, env: Record<string, string 
     // Register first so an interrupted upload is still covered by retention cleanup.
     await api("rest/v1/line_summary_previews", "POST", { employee_id: details.employee_id, period: `${month}-01`, object_path: objectPath }, { Prefer: "resolution=merge-duplicates" });
     await api(`storage/v1/object/${REPORT_BUCKET}/${objectPath}`, "POST", report, { "x-upsert": "true", "cache-control": "no-store" });
-    const link = `https://ihd-gen.vercel.app/line/monthly#${encodeURIComponent(await signed(REPORT_BUCKET, objectPath))}`;
+    const token = randomBytes(16).toString("base64url");
+    await api("rest/v1/line_report_links", "POST", { token_hash: createHash("sha256").update(token).digest("hex"), employee_id: details.employee_id, period: `${month}-01`, object_path: objectPath, expires_at: new Date(expiresAt).toISOString() });
+    const link = `https://ihd-gen.vercel.app/s#${token}`;
     return { text: `ลิงก์สรุปทดสอบเดือน ${month}\n${details.name}\n${link}\n\nเปิดดูตารางและบันทึกเป็น PDF ได้ ลิงก์ใช้ได้ไม่เกิน 24 ชั่วโมงครับ`, buttons };
   } catch { return { text: "สร้างลิงก์สรุปไม่สำเร็จ กรุณาลองใหม่อีกครั้งครับ", buttons }; }
 }

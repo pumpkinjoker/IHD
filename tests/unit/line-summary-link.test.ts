@@ -3,6 +3,7 @@ import { summaryLinkReply } from "@/lib/line/summary-link";
 import { parseSummaryLink, parseSummaryLinkPostback } from "@/lib/line/summary";
 import { REPORT_STORAGE_ORIGIN, monthlyReportSchema } from "@/lib/reports/monthly-report";
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 const employee = { employeeId: "12345678", name: "คนทดสอบ", active: true };
 const details = { employee_id: employee.employeeId, name: employee.name, email: "employee@example.com", team: "Team", position: "Staff" };
 const reference = "supabase:" + "a".repeat(64);
@@ -17,6 +18,7 @@ it("creates an owned, short-lived preview without touching the final monthly out
   const store = { employeeDetails: vi.fn().mockResolvedValue(details), employeeEntries: vi.fn().mockResolvedValue([row]) };
   const calls: string[] = [];
   let snapshot: unknown;
+  let linkRow: Record<string,string> = {};
   const transport: typeof fetch = async (input, init) => {
     const url = new URL(String(input)); calls.push(url.pathname);
     if (url.pathname.includes("line_evidence_files")) {
@@ -28,10 +30,14 @@ it("creates an owned, short-lived preview without touching the final monthly out
       return Response.json({ signedURL: url.pathname.replace("/storage/v1", "") + "?token=sample" });
     }
     if (url.pathname.includes("/object/ihd-monthly-reports/")) snapshot = JSON.parse(init!.body as string);
+    if (url.pathname.includes("line_report_links")) linkRow = JSON.parse(init!.body as string);
     return new Response(null, { status: 201 });
   };
   const reply = await summaryLinkReply(store, { SUPABASE_URL: REPORT_STORAGE_ORIGIN, SUPABASE_SERVICE_ROLE_KEY: "server-key" }, employee, "2026-10", true, transport, new Date("2026-10-27T01:00:00Z"));
-  expect(reply.text).toContain("https://ihd-gen.vercel.app/line/monthly#");
+  const token = reply.text.match(/https:\/\/ihd-gen\.vercel\.app\/s#([A-Za-z0-9_-]{22})/)?.[1];
+  expect(token).toBeTruthy();
+  expect(linkRow.token_hash).toBe(createHash("sha256").update(token!).digest("hex"));
+  expect(linkRow.employee_id).toBe(employee.employeeId);
   const report = monthlyReportSchema.parse(snapshot);
   expect(report.preview).toBe(true);
   expect(report.requester.employeeId).toBe(employee.employeeId);
@@ -67,15 +73,19 @@ it.skipIf(process.env.IHD_LINK_SMOKE !== "1")("opens an actual signed preview an
     await api(`storage/v1/object/ihd-evidence-test/${sourcePath}`, "POST", readFileSync("public/brand/toa-logo.png"), { "Content-Type": "image/png" });
     await api("rest/v1/line_evidence_files", "POST", { reference: ref, employee_id: fake.employeeId, object_path: sourcePath, work_date: `${month}-01`, mime_type: "image/png" });
     const reply = await summaryLinkReply({ employeeDetails: vi.fn().mockResolvedValue({ ...details, employee_id: fake.employeeId, name: fake.name }), employeeEntries: vi.fn().mockResolvedValue([{ ...row, data: { ...row.data, employeeId: fake.employeeId, imageId: ref, workDate: `${month}-01` } }]) }, process.env, fake, month, false);
-    const link = reply.text.match(/https:\/\/ihd-gen\.vercel\.app\/line\/monthly#[^\s]+/)?.[0];
+    const link = reply.text.match(/https:\/\/ihd-gen\.vercel\.app\/s#[^\s]+/)?.[0];
     expect(link).toBeTruthy();
-    const response = await fetch(decodeURIComponent(link!.split("#")[1]));
+    const resolver = await fetch(`${base}/functions/v1/resolve-report-link`, { method: "POST", headers: { "Content-Type": "application/json", Origin: "https://ihd-gen.vercel.app" }, body: JSON.stringify({ token: link!.split("#")[1] }) });
+    expect(resolver.ok).toBe(true);
+    expect(resolver.headers.get("access-control-allow-origin")).toBe("https://ihd-gen.vercel.app");
+    const response = await fetch((await resolver.json()).url);
     expect(response.ok).toBe(true);
     const report = monthlyReportSchema.parse(await response.json());
     expect(report.preview).toBe(true);
     expect(report.requester.employeeId).toBe(fake.employeeId);
     expect((await fetch(report.draft.workItems[0].evidenceImage!.dataUrl)).ok).toBe(true);
   } finally {
+    await api(`rest/v1/line_report_links?${filter}`, "DELETE");
     await api("storage/v1/object/ihd-monthly-reports", "DELETE", { prefixes: [previewPath] });
     await api(`rest/v1/line_summary_previews?${filter}`, "DELETE");
     await api("storage/v1/object/ihd-evidence-test", "DELETE", { prefixes: [sourcePath] });

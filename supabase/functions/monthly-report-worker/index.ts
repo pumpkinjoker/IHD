@@ -99,7 +99,10 @@ export async function runMonthlyReports(request: Request, env: { url: string }, 
           const report = buildMonthlyReport(job, images);
           const content = new TextEncoder().encode(JSON.stringify(report));
           await api(`storage/v1/object/${REPORT_BUCKET}/${objectPath(reportPath)}`, "POST", content, { "Content-Type": "application/json", "x-upsert": "true", "cache-control": "no-store" });
-          const reportUrl = `${config.appOrigin}/line/monthly#${encodeURIComponent(await signed(reportPath, job.expires_at))}`;
+          const shortToken = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16)))).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+          const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(shortToken))), (byte) => byte.toString(16).padStart(2, "0")).join("");
+          await api("rest/v1/line_report_links", "POST", { token_hash: hash, employee_id: job.employee_id, period: job.period, object_path: reportPath, expires_at: job.expires_at });
+          const reportUrl = `${config.appOrigin}/s#${shortToken}`;
           const perDiem = report.draft.workItems.reduce((sum, item) => sum + Number(item.perDiem || 0), 0);
           const message = `${report.title}\n${report.requester.name}\n${report.draft.workItems.length} วัน · เบี้ยเลี้ยงรวม ${perDiem.toLocaleString("th-TH")} บาท\n\nเปิดสรุปและบันทึก PDF ตามแบบฟอร์มเดิม:\n${reportUrl}\n\nลิงก์ส่วนตัวนี้ใช้ได้ถึงก่อนรอบล้างข้อมูลเดือนที่ 3`;
           if (message.length > 5000) throw new Error("Report link too long");

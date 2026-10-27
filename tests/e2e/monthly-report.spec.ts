@@ -10,7 +10,11 @@ test("opens a personal monthly summary and prints the existing form with all evi
   const entries = Array.from({ length: 31 }, (_, index) => ({ id: `row-${index}`, data: { workDate: `2026-10-${String(index+1).padStart(2,"0")}`, subject: `งานตัวอย่างวันที่ ${index+1}`, location: "สถานที่ตัวอย่าง", imageId: "supabase:" + "a".repeat(64) } }));
   const report = buildMonthlyReport({ id: "sample", period: "2026-10-01", employee_id: "00000000", line_user_id: "unused", snapshot: { employee: { employee_id: "00000000", name: "พนักงาน ตัวอย่าง", email: "example@example.com", position: "พนักงาน", team: "ทีมตัวอย่าง" }, entries }, report_url: null, push_text: null, retry_key: "unused", expires_at: "2030-01-01T00:00:00Z" }, entries.map(() => ({ fileName: "photo.png", mimeType: "image/png", dataUrl: imageUrl })));
   await page.route(`${origin}/storage/v1/object/sign/**`, (route) => route.request().url().includes("summary.json") ? route.fulfill({ json: { ...report, preview: true } }) : route.fulfill({ contentType: "image/png", body: png }));
-  await page.goto(`/line/monthly#${encodeURIComponent(summaryUrl)}`);
+  await page.route(`${origin}/functions/v1/resolve-report-link`, async (route) => {
+    expect(route.request().postDataJSON()).toEqual({ token: "a".repeat(22) });
+    await route.fulfill({ json: { url: summaryUrl } });
+  });
+  await page.goto(`/s#${"a".repeat(22)}`);
   await expect(page.getByRole("heading", { name: /สรุปยอดเบิกเบี้ยเลี้ยงเดือน/ })).toBeVisible();
   await expect(page.getByText(/สรุปช่วงทดสอบ ณ ตอนเรียกดู/)).toBeVisible();
   await expect(page.getByText("31 วัน · รวม 9,300.00 บาท")).toBeVisible();

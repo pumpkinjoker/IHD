@@ -391,3 +391,11 @@ as a test preview and supports Save as PDF. Preview JSON is tracked separately
 in `line_summary_previews`, so it cannot replace or suppress the final monthly
 outbox. The existing cleanup deletes expired preview objects and registry rows
 at the start of the third month. No public table access is granted.
+
+New preview and monthly links use `/s#<22-character random token>`. Only its
+SHA-256 hash is stored in the private `line_report_links` table. The
+`resolve-report-link` function authenticates this scoped bearer token and returns
+a report-only signed URL valid for at most 60 seconds; the token keeps the original
+report expiry. Cleanup removes expired tokens daily. Existing long links still work.
+When editing a draft's work date in LINE, enter only the day (`7`, `27`); the month
+and year remain those of the draft. Invalid days and future dates are rejected.

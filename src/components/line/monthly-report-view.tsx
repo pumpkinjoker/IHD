@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { DocumentPackagePreview } from "@/components/documents/expense-request/document-package-preview";
 import { calculateGrandTotal } from "@/lib/calculations/expense";
 import { formatMoney } from "@/lib/money/format-money";
-import { isReportAsset, monthlyReportSchema, type MonthlyReport } from "@/lib/reports/monthly-report";
+import { REPORT_STORAGE_ORIGIN, isReportAsset, monthlyReportSchema, type MonthlyReport } from "@/lib/reports/monthly-report";
 
 export function MonthlyReportView() {
   const [report, setReport] = useState<MonthlyReport | null>(null);
@@ -14,7 +14,12 @@ export function MonthlyReportView() {
     const abort = new AbortController();
     void (async () => {
       try {
-        const url = decodeURIComponent(window.location.hash.slice(1));
+        let url = decodeURIComponent(window.location.hash.slice(1));
+        if (/^[A-Za-z0-9_-]{22}$/.test(url)) {
+          const resolved = await fetch(`${REPORT_STORAGE_ORIGIN}/functions/v1/resolve-report-link`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: url }), cache: "no-store", referrerPolicy: "no-referrer", signal: abort.signal });
+          if (!resolved.ok) throw new Error("ลิงก์ไม่ถูกต้อง หมดอายุ หรือข้อมูลถูกล้างแล้ว");
+          url = (await resolved.json()).url;
+        }
         if (!isReportAsset(url)) throw new Error("ลิงก์รายงานไม่ถูกต้อง กรุณาเปิดจากข้อความที่บอตส่งให้");
         const response = await fetch(url, { cache: "no-store", referrerPolicy: "no-referrer", signal: abort.signal });
         if (!response.ok) throw new Error("รายงานหมดอายุหรือถูกล้างตามรอบแล้ว");

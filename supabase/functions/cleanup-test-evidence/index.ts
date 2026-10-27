@@ -69,6 +69,7 @@ export async function cleanupTestEvidence(request: Request, env: { url: string; 
       await api(`rest/v1/line_summary_previews?${new URLSearchParams({ object_path: `in.(${previews.map((preview) => preview.object_path).join(",")})`, period: `lt.${cutoff}` })}`, "DELETE");
       if (previews.length < 100) break;
     }
+    await api(`rest/v1/line_report_links?${new URLSearchParams({ or: `(expires_at.lt.${now.toISOString()},period.lt.${cutoff})` })}`, "DELETE");
     return json({ cutoff, removed, entriesRemoved, eventsRemoved, reportsRemoved });
   } catch { return json({ error: "Cleanup failed; safe to retry", removed }, 503); }
   finally { if (locked) await api("rest/v1/rpc/line_release_media", "POST", { p_lease: lease }).catch(() => undefined); }

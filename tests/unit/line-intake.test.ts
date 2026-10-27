@@ -68,12 +68,13 @@ describe("LINE work entry conversation", () => {
     expect(replaced.state.step).toBe("review");
     expect(replaced.state.draft?.imageId).toBe("new-photo");
   });
-  it("allows real past dates and rejects invalid or future dates", () => {
+  it("accepts day-only edits in the original month and rejects invalid, future or cross-month dates", () => {
     const state = run([...completed, { type: "edit", field: "date" }]).state;
-    for (const text of ["2026-02-30", "2026-13-01", "2026-10-28", "27/10/2569", ""]) {
+    for (const text of ["0", "32", "28", "2026-02-28", "2026-02-30", "2026-13-01", "2026-10-28", "27/10/2569", ""]) {
       expect(transitionIntake(state, { type: "text", text }, now).state.step).toBe("date");
     }
-    expect(transitionIntake(state, { type: "text", text: "2026-02-28" }, now).state.draft?.workDate).toBe("2026-02-28");
+    expect(transitionIntake(state, { type: "text", text: "25" }, now).state.draft?.workDate).toBe("2026-10-25");
+    expect(transitionIntake(state, { type: "text", text: "3" }, now).state.draft?.workDate).toBe("2026-10-03");
   });
   it("keeps independent employees' conversation state isolated", () => {
     const first = run(completed).state;

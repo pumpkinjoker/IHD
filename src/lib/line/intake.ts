@@ -101,7 +101,7 @@ export function transitionIntake(
       photo: "ส่งรูปใหม่ 1 รูปเพื่อแทนรูปเดิมครับ",
       subject: "พิมพ์หัวข้องานใหม่ครับ",
       location: "พิมพ์สถานที่ใหม่ครับ",
-      date: "พิมพ์วันที่เป็น ค.ศ. YYYY-MM-DD เช่น 2026-10-25 ครับ"
+      date: `พิมพ์แค่เลขวันที่ เช่น 25 ครับ ใช้เดือนและปีเดิม (${draft.workDate.slice(0, 7)})`
     };
     return { state: { step: action.field, draft }, reply: { text: prompts[action.field], buttons: [cancelButton] } };
   }
@@ -127,8 +127,11 @@ export function transitionIntake(
   if (current.step === "photo") return unchanged("กรุณาส่งรูปหน้างาน 1 รูปก่อนครับ");
   if (current.step === "review") return { state: current, reply: review(draft) };
   if (current.step === "date") {
-    if (!validWorkDate(value, bangkokDate(now))) return unchanged("วันที่ไม่ถูกต้องหรืออยู่ในอนาคต กรุณาใช้ ค.ศ. YYYY-MM-DD ครับ");
-    draft.workDate = value;
+    const month = draft.workDate.slice(0, 7);
+    const day = /^\d{1,2}$/.test(value) ? value.padStart(2, "0") : value.startsWith(month + "-") && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value.slice(8) : "";
+    const date = `${month}-${day}`;
+    if (!day || !validWorkDate(date, bangkokDate(now))) return unchanged("วันที่ไม่ถูกต้องหรืออยู่ในอนาคตครับ พิมพ์แค่เลขวันภายในเดือนเดิม เช่น 25");
+    draft.workDate = date;
   } else {
     if (!value || value.length > 300) return unchanged("กรุณาพิมพ์ข้อมูล 1–300 ตัวอักษรครับ");
     if (current.step === "subject") {

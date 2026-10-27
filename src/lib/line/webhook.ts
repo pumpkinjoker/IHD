@@ -39,20 +39,26 @@ export function eventToIntakeAction(event: LineEvent): EmployeeIntakeAction | nu
 export function toLineMessage(reply: IntakeReply) {
   if (reply.table) {
     const table = reply.table;
-    const text = (value: string, extra: Record<string, unknown> = {}) => ({ type: "text", text: value || "—", size: "xs", wrap: true, ...extra });
+    // LINE's lineSpacing only separates wrapped lines. Give the first and last
+    // lines their own padding too, so stacked Thai vowels and tone marks fit.
+    const text = (value: string, extra: Record<string, unknown> = {}) => {
+      const { flex, ...style } = extra;
+      return { type: "box", layout: "vertical", paddingTop: "2px", paddingBottom: "2px", ...(flex === undefined ? {} : { flex }),
+        contents: [{ type: "text", text: value || "—", size: "xs", wrap: true, lineSpacing: "6px", ...style }] };
+    };
     const column = (value: string, width: string, extra: Record<string, unknown> = {}) => ({ type: "box", layout: "vertical", width, flex: 0, contents: [text(value, extra)] });
     return {
       type: "flex" as const, altText: reply.text.slice(0, 400),
-      contents: { type: "bubble", size: "mega", body: { type: "box", layout: "vertical", paddingAll: "12px", spacing: "sm", contents: [
+      contents: { type: "bubble", size: "mega", body: { type: "box", layout: "vertical", paddingAll: "16px", spacing: "6px", contents: [
         text(table.title, { size: "md", weight: "bold" }), text(table.subtitle, { color: "#666666" }),
         { type: "separator" },
         { type: "box", layout: "horizontal", spacing: "sm", contents: [column("วันที่", "42px", { weight: "bold" }), text("งาน / สถานที่", { flex: 1, weight: "bold" }), column("เบี้ยเลี้ยง", "65px", { align: "end", weight: "bold" })] },
         ...table.rows.map((row) => ({ type: "box", layout: "horizontal", spacing: "sm", contents: [
           column(row.date, "42px"),
-          { type: "box", layout: "vertical", flex: 1, contents: [text(row.subject, { maxLines: 2 }), text(row.location, { size: "xxs", color: "#777777", maxLines: 1 })] },
+          { type: "box", layout: "vertical", flex: 1, spacing: "2px", contents: [text(row.subject), text(row.location, { color: "#777777" })] },
           column(row.amount, "65px", { align: "end" })
         ] })),
-        { type: "separator" }, text(`เบี้ยเลี้ยงรวมทั้งเดือน ${table.total} บาท`, { weight: "bold" }), text(table.note, { size: "xxs", color: "#666666" })
+        { type: "separator" }, text(`เบี้ยเลี้ยงรวมทั้งเดือน ${table.total} บาท`, { weight: "bold" }), text(table.note, { color: "#666666" })
       ] } },
       ...(reply.buttons.length ? { quickReply: { items: reply.buttons.map((button) => ({ type: "action", action: { type: "postback", label: button.label, data: button.data, displayText: button.label } })) } } : {})
     };
@@ -71,7 +77,7 @@ export function toLineMessage(reply: IntakeReply) {
       altText: reply.text.slice(0, 400),
       contents: {
         type: "bubble", size: "mega",
-        body: { type: "box", layout: "vertical", paddingAll: "12px", contents: [{ type: "text", text: reply.text, size: "sm", wrap: true }] },
+        body: { type: "box", layout: "vertical", paddingAll: "16px", contents: [{ type: "text", text: reply.text, size: "sm", wrap: true, lineSpacing: "6px" }] },
         footer: { type: "box", layout: "vertical", paddingAll: "12px", spacing: "sm", contents: [
           ...primary.map((button) => buttonComponent(button, true)),
           ...(secondary.length ? [{ type: "box", layout: secondary.length <= 2 ? "horizontal" : "vertical", spacing: "sm", contents: secondary.map((button) => buttonComponent(button)) }] : [])

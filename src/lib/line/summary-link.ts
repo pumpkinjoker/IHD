@@ -7,7 +7,7 @@ import { randomBytes, createHash } from "node:crypto";
 
 type Store = Pick<SupabaseLineStore, "employeeEntries" | "employeeDetails">;
 export async function summaryLinkReply(store: Store, env: Record<string, string | undefined>, employee: IntakeEmployee, month: string, hasDraft: boolean, request: typeof fetch = fetch, now = new Date()): Promise<IntakeReply> {
-  const buttons = [{ label: "ดูสรุปตาราง", data: `summary:${month}:0` }, hasDraft ? { label: "กลับรายการที่ค้าง", data: "intake:resume" } : { label: "เพิ่มข้อมูลหน้างาน", data: "intake:start" }];
+  const buttons = [{ label: "ตารางสรุป", data: `summary:${month}:0` }, hasDraft ? { label: "กลับรายการที่ค้าง", data: "intake:resume" } : { label: "เพิ่มข้อมูล", data: "intake:start" }];
   try {
     const details = await store.employeeDetails(employee.employeeId);
     if (!details) return { text: "ไม่พบพนักงานที่ใช้งานอยู่ครับ", buttons };

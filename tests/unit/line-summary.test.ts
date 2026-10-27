@@ -6,6 +6,7 @@ import { toLineMessage } from "@/lib/line/webhook";
 const employee = { employeeId: "12345678", name: "คนทดสอบ", active: true };
 describe("test LINE summary table", () => {
   it("parses current/explicit months and rejects invalid page requests", () => {
+    expect(parseSummaryCommand("ตารางสรุป", "2026-10")).toEqual({ month: "2026-10", offset: 0 });
     expect(parseSummaryCommand("ดูสรุปตาราง", "2026-10")).toEqual({ month: "2026-10", offset: 0 });
     expect(parseSummaryCommand("ดูสรุปตาราง 2026-09", "2026-10")?.month).toBe("2026-09");
     expect(parseSummaryCommand("ดูสรุปตาราง 2026-13", "2026-10")).toBeNull();

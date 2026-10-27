@@ -20,7 +20,7 @@ export function recordReply(page: EntryPage, month: string, offset: number, hasD
     buttons: [
       ...(offset ? [{ label: "ก่อนหน้า", data: `records:${month}:${Math.max(0, offset - RECORD_PAGE_SIZE)}` }] : []),
       ...(page.hasMore ? [{ label: "ถัดไป", data: `records:${month}:${offset + RECORD_PAGE_SIZE}` }] : []),
-      ...(hasDraft ? [{ label: "กลับรายการที่ค้าง", data: "intake:resume" }] : [{ label: "เพิ่มข้อมูลหน้างาน", data: "intake:start" }])
+      ...(hasDraft ? [{ label: "กลับรายการที่ค้าง", data: "intake:resume" }] : [{ label: "เพิ่มข้อมูล", data: "intake:start" }])
     ]
   };
 }

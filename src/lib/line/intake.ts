@@ -71,7 +71,7 @@ export function transitionIntake(
     state: current, reply: { text, buttons }
   });
   if (action.type === "cancel") {
-    return { state: INITIAL_INTAKE_STATE, reply: { text: "ยกเลิกรายการแล้ว", buttons: [{ label: "เพิ่มข้อมูลหน้างาน", data: "intake:start" }] } };
+    return { state: INITIAL_INTAKE_STATE, reply: { text: "ยกเลิกรายการแล้ว", buttons: [{ label: "เพิ่มข้อมูล", data: "intake:start" }] } };
   }
   if (action.type === "start") {
     if (current.step !== "idle") return unchanged("มีรายการที่กำลังทำอยู่ กรุณาทำต่อ หรือกดยกเลิกก่อนเริ่มรายการใหม่");
@@ -81,7 +81,7 @@ export function transitionIntake(
     };
   }
   if (!current.draft || current.step === "idle") {
-    return unchanged("กดเพิ่มข้อมูลหน้างานเพื่อเริ่มรายการครับ", [{ label: "เพิ่มข้อมูลหน้างาน", data: "intake:start" }]);
+    return unchanged("กดเพิ่มข้อมูลเพื่อเริ่มรายการครับ", [{ label: "เพิ่มข้อมูล", data: "intake:start" }]);
   }
   const draft = { ...current.draft };
   if (action.type === "resume" && current.step === "review") return { state: current, reply: review(draft) };
@@ -112,7 +112,7 @@ export function transitionIntake(
     return {
       state: INITIAL_INTAKE_STATE,
       entry: { ...draft, imageId: draft.imageId },
-      reply: { text: "บันทึกรายการหน้างานแล้วครับ", buttons: [{ label: "เพิ่มข้อมูลหน้างาน", data: "intake:start" }] }
+      reply: { text: "บันทึกรายการหน้างานแล้วครับ", buttons: [{ label: "เพิ่มข้อมูล", data: "intake:start" }] }
     };
   }
   if (action.type === "image") {

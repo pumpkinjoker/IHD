@@ -115,7 +115,7 @@ export class LocalLineStore implements LineStore {
     const entries = await db.query<{ data: EmployeeWorkEntry }>("select data from public.line_work_entries where user_id=$1 order by created_at", [userId]);
     const replies = state ? await db.query<{ reply: IntakeReply }>("select reply from public.line_events where event_id=$1 and user_id=$2 and status='done'", [state.buttonContext, userId]) : null;
     return { state: state?.conversation ?? INITIAL_EMPLOYEE_INTAKE_STATE, entries: entries.rows.map((row) => row.data), reply: replies?.rows[0]?.reply ?? {
-      text: "กดเพิ่มข้อมูลหน้างานเพื่อเริ่มบันทึกลงเครื่องครับ", buttons: [{ label: "เพิ่มข้อมูลหน้างาน", data: "intake:start" }]
+      text: "กดเพิ่มข้อมูลเพื่อเริ่มบันทึกลงเครื่องครับ", buttons: [{ label: "เพิ่มข้อมูล", data: "intake:start" }]
     } };
   }
   async ownsImage(userId: string, reference: string) {

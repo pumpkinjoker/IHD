@@ -10,6 +10,7 @@ const reference = "supabase:" + "a".repeat(64);
 const row = { id: "one", data: { employeeId: employee.employeeId, employeeName: employee.name, imageId: reference, workDate: "2026-10-01", subject: "งาน", location: "สถานที่", expense: { perDiem: 450 } } };
 
 it("parses a request for a private link and rejects invalid months", () => {
+  expect(parseSummaryLink("ลิงก์เอกสารเบิก", "2026-10")).toEqual({ month: "2026-10" });
   expect(parseSummaryLink("ขอลิงก์สรุป", "2026-10")).toEqual({ month: "2026-10" });
   expect(parseSummaryLinkPostback("summary-link:2026-10")).toEqual({ month: "2026-10" });
   expect(parseSummaryLinkPostback("summary-link:2026-13")).toBeNull();

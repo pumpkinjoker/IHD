@@ -79,7 +79,7 @@ export function createLineReceiver(deps: ReceiverDependencies): DurableLineRecei
             staleButton = data !== "intake:start" && (!context || context !== claim.state?.buttonContext);
             action = eventToIntakeAction({ ...event, postback: { data } })!;
           }
-          if (action.type === "text" && action.text.trim() === "เพิ่มข้อมูลหน้างาน" && current.onboarding === "idle" && current.intake.step === "idle") {
+          if (action.type === "text" && ["เพิ่มข้อมูล", "เพิ่มข้อมูลหน้างาน"].includes(action.text.trim()) && current.onboarding === "idle" && current.intake.step === "idle") {
             action = { type: "start" };
           }
           const validPhotoStep = action.type === "image" && current.employee &&
@@ -117,7 +117,7 @@ export function createLineReceiver(deps: ReceiverDependencies): DurableLineRecei
             state: current,
             reply: await deps.summary(current.employee, summaryRequest.month, summaryRequest.offset, current.intake.step !== "idle")
           } : menuRequest ? {
-            state: current, reply: { text: "เลือกเมนูได้เลยครับ รายการที่กำลังกรอกยังอยู่เหมือนเดิม", buttons: [current.intake.step !== "idle" ? { label: "กลับรายการที่ค้าง", data: "intake:resume" } : { label: "เพิ่มข้อมูลหน้างาน", data: "intake:start" }] }
+            state: current, reply: { text: "เลือกเมนูได้เลยครับ รายการที่กำลังกรอกยังอยู่เหมือนเดิม", buttons: [current.intake.step !== "idle" ? { label: "กลับรายการที่ค้าง", data: "intake:resume" } : { label: "เพิ่มข้อมูล", data: "intake:start" }] }
           } : recordRequest && current.employee ? {
             state: current,
             reply: recordReply(await deps.store.listEntries(event.source.userId, current.employee.employeeId, recordRequest.month, recordRequest.offset),
@@ -133,11 +133,18 @@ export function createLineReceiver(deps: ReceiverDependencies): DurableLineRecei
           const buttons = [...result.reply.buttons];
           const summaryData = `summary:${linkRequest?.month || summaryRequest?.month || recordRequest?.month || month}:0`;
           if (deps.summary && result.state.employee && result.state.onboarding === "idle" && !buttons.some((button) => button.data === summaryData) && (menuRequest || summaryRequest || recordRequest || result.state.intake.step === "idle" || (result.state.intake.step === "photo" && !result.state.intake.draft?.imageId))) {
-            buttons.push({ label: "ดูสรุปตาราง", data: summaryData });
+            buttons.push({ label: "ตารางสรุป", data: summaryData });
           }
+          if (menuRequest && deps.summaryLink && result.state.employee && result.state.onboarding === "idle") {
+            buttons.push({ label: "ลิงก์เอกสารเบิก", data: `summary-link:${month}` });
+          }
+          const rank = (data: string) => data === "intake:start" ? 0 : data.startsWith("summary:") ? 1 : data.startsWith("summary-link:") ? 2 : 3;
+          const navigation = buttons.filter((button) => rank(button.data) < 3).sort((a, b) => rank(a.data) - rank(b.data));
+          let navigationIndex = 0;
+          const ordered = buttons.map((button) => rank(button.data) < 3 ? navigation[navigationIndex++] : button);
           const reply: IntakeReply = {
             ...result.reply,
-            buttons: buttons.map((button) => ({ ...button, data: `${button.data}|${event.webhookEventId}` }))
+            buttons: ordered.map((button) => ({ ...button, data: `${button.data}|${event.webhookEventId}` }))
           };
           // Entry creation, clearing the draft and recording the reply are atomic.
           await deps.store.finish(event, lease, { conversation: result.state, buttonContext: event.webhookEventId }, result.entry, reply);

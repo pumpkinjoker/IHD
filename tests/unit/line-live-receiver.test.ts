@@ -83,6 +83,16 @@ beforeEach(async () => {
 afterAll(async () => { await db?.close(); });
 
 describe("real LINE processing with durable SQL transactions", () => {
+  it("orders the renamed navigation buttons without changing their actions", async () => {
+    const summary = vi.fn<NonNullable<ReceiverDependencies["summary"]>>().mockResolvedValue({ text: "ตาราง", buttons: [{ label: "ลิงก์เอกสารเบิก", data: "summary-link:2026-10" }, { label: "เพิ่มข้อมูล", data: "intake:start" }] });
+    const h = harness(summary, vi.fn());
+    const confirm = await prepare(h);
+    await h.receiver.receive([postback(confirm)]);
+    await h.receiver.receive([message("text", "เมนู")]);
+    const buttons = h.line.reply.mock.calls.at(-1)![1].buttons;
+    expect(buttons.map((button) => button.label)).toEqual(["เพิ่มข้อมูล", "ตารางสรุป", "ลิงก์เอกสารเบิก"]);
+    expect(buttons.map((button) => button.data.split("|")[0])).toEqual(["intake:start", "summary:2026-10:0", "summary-link:2026-10"]);
+  });
   it("requests an owned summary link without clearing the draft", async () => {
     const link = vi.fn<NonNullable<ReceiverDependencies["summaryLink"]>>().mockResolvedValue({ text: "ลิงก์ส่วนตัว", buttons: [{ label: "กลับรายการที่ค้าง", data: "intake:resume" }] });
     const h = harness(undefined, link);
@@ -98,7 +108,7 @@ describe("real LINE processing with durable SQL transactions", () => {
     const h = harness(summary);
     await prepare(h);
     await h.receiver.receive([message("text", "เมนู")]);
-    const button = h.line.reply.mock.calls.at(-1)![1].buttons.find((button) => button.label === "ดูสรุปตาราง")!;
+    const button = h.line.reply.mock.calls.at(-1)![1].buttons.find((button) => button.label === "ตารางสรุป")!;
     await h.receiver.receive([postback(button.data)]);
     expect(summary).toHaveBeenCalledWith(employee, "2026-10", 0, true);
     const session = (await db.query<{ state: { conversation: { intake: { step: string; draft: { subject: string } } } } }>("select state from public.line_sessions where user_id='user-1'")).rows[0];

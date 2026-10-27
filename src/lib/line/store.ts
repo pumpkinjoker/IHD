@@ -102,7 +102,7 @@ export class SupabaseLineStore implements LineStore {
     const entries = await this.call(`line_work_entries?${new URLSearchParams({ user_id: `eq.${userId}`, select: "data", order: "created_at.asc", limit: "500" })}`, undefined, "GET") as { data: EmployeeWorkEntry }[];
     const replies = state ? await this.call(`line_events?${new URLSearchParams({ event_id: `eq.${state.buttonContext}`, user_id: `eq.${userId}`, status: "eq.done", select: "reply", limit: "1" })}`, undefined, "GET") as { reply: IntakeReply }[] : [];
     return { state: state?.conversation ?? INITIAL_EMPLOYEE_INTAKE_STATE, entries: entries.map((row) => row.data), reply: replies[0]?.reply ?? {
-      text: "กดเพิ่มข้อมูลหน้างานเพื่อเริ่มบันทึกครับ", buttons: [{ label: "เพิ่มข้อมูลหน้างาน", data: "intake:start" }]
+      text: "กดเพิ่มข้อมูลเพื่อเริ่มบันทึกครับ", buttons: [{ label: "เพิ่มข้อมูล", data: "intake:start" }]
     } };
   }
   async ownsImage(userId: string, reference: string) {

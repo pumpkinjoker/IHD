@@ -19,7 +19,7 @@ export const INITIAL_EMPLOYEE_INTAKE_STATE: EmployeeIntakeState = {
   employee: null, candidate: null, onboarding: "idle", intake: INITIAL_INTAKE_STATE
 };
 const cancel = { label: "ยกเลิก", data: "intake:cancel" };
-const start = { label: "เพิ่มข้อมูลหน้างาน", data: "intake:start" };
+const start = { label: "เพิ่มข้อมูล", data: "intake:start" };
 const change = { label: "เปลี่ยนรหัสพนักงาน", data: "employee:change" };
 
 /** Employee ID is a self-declared association, not proof of identity. */

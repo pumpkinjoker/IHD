@@ -43,7 +43,7 @@ export function toLineMessage(reply: IntakeReply) {
     // visible text stays 12px. Outer box padding alone did not protect marks.
     const text = (value: string, extra: Record<string, unknown> = {}) => {
       const { flex, margin, size = "12px", weight, color, compact = false, ...style } = extra;
-      const lineSize = size === "16px" ? "20px" : "16px";
+      const lineSize = size === "16px" ? "20px" : size === "14px" ? "18px" : "16px";
       const strut = { type: "span", text: "\u200B", size: lineSize };
       return { type: "box", layout: "vertical", paddingTop: compact ? "0px" : "1px", paddingBottom: compact ? "0px" : "1px", ...(flex === undefined ? {} : { flex }), ...(margin === undefined ? {} : { margin }),
         contents: [{ type: "text", size: lineSize, wrap: true, lineSpacing: "4px", ...style, contents: [strut,
@@ -55,13 +55,13 @@ export function toLineMessage(reply: IntakeReply) {
       contents: { type: "bubble", size: "mega", body: { type: "box", layout: "vertical", paddingAll: "16px", spacing: "8px", contents: [
         { type: "box", layout: "vertical", spacing: "2px", contents: [text(table.title, { size: "16px", weight: "bold" }), text(table.subtitle, { color: "#666666" })] },
         { type: "separator" },
-        { type: "box", layout: "horizontal", spacing: "sm", margin: "14px", contents: [column("วันที่", "48px", { weight: "bold", wrap: false }), text("รายการ / สถานที่", { flex: 1, weight: "bold", wrap: false }), column("เบี้ยเลี้ยง", "76px", { align: "end", weight: "bold", wrap: false })] },
+        { type: "box", layout: "horizontal", spacing: "sm", margin: "14px", contents: [column("วันที่", "48px", { weight: "bold", wrap: false }), text("รายการ / สถานที่", { flex: 1, weight: "bold", wrap: false }), column("เบิกค่าใช้จ่าย", "96px", { align: "end", weight: "bold", wrap: false })] },
         { type: "box", layout: "vertical", spacing: "16px", margin: "0px", contents: table.rows.map((row) => ({ type: "box", layout: "horizontal", spacing: "sm", contents: [
           column(row.date, "48px", { wrap: false, compact: true }),
           { type: "box", layout: "vertical", flex: 1, spacing: "none", contents: [text(row.subject, { compact: true }), text(row.location, { color: "#777777", compact: true })] },
-          column(row.amount, "76px", { align: "end", wrap: false, compact: true })
+          column(row.amount, "96px", { align: "end", wrap: false, compact: true })
         ] })) },
-        { type: "separator" }, text(`เบี้ยเลี้ยงทั้งหมด ${table.total} บาท`, { weight: "bold", margin: "14px", align: "end" })
+        { type: "separator" }, text(`เบิกค่าใช้จ่ายทั้งหมด ${table.total} บาท`, { size: "14px", weight: "bold", margin: "14px", align: "end" })
       ] } },
       ...(reply.buttons.length ? { quickReply: { items: reply.buttons.map((button) => ({ type: "action", action: { type: "postback", label: button.label, data: button.data, displayText: button.label } })) } } : {})
     };

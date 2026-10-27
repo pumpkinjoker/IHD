@@ -1,4 +1,3 @@
-import { formatMoney } from "@/lib/money/format-money";
 import { reportWorkItem } from "@/lib/reports/monthly-report";
 import type { SupabaseLineStore } from "./store";
 import type { IntakeEmployee } from "./employee-intake";
@@ -6,6 +5,7 @@ import type { IntakeReply } from "./intake";
 import { validMonth } from "./records";
 
 export const SUMMARY_PAGE_SIZE = 5;
+const wholeBaht = new Intl.NumberFormat("th-TH", { maximumFractionDigits: 0 });
 export function parseSummaryLink(text: string, currentMonth: string) {
   const match = /^(?:ขอลิงก์สรุป|ขอลิงค์สรุป|ดูลิงก์สรุป)(?:\s+(\d{4}-\d{2}))?$/.exec(text.trim());
   const month = match?.[1] || currentMonth;
@@ -29,12 +29,12 @@ export async function summaryReply(store: Pick<SupabaseLineStore, "employeeEntri
   if (!active?.active) return { text: "ไม่พบพนักงานที่ใช้งานอยู่ กรุณาตรวจสอบรหัสพนักงานครับ", buttons: [] };
   const entries = await store.employeeEntries(active.employeeId, month);
   const items = entries.map(reportWorkItem);
-  const total = formatMoney(items.reduce((sum, item) => sum + (item.perDiem ?? 0), 0));
-  const rows = items.slice(offset, offset + SUMMARY_PAGE_SIZE).map((item) => ({ date: item.workDate.slice(8,10), subject: item.subject, location: item.location || "—", amount: formatMoney(item.perDiem ?? 0) }));
+  const total = wholeBaht.format(items.reduce((sum, item) => sum + (item.perDiem ?? 0), 0));
+  const rows = items.slice(offset, offset + SUMMARY_PAGE_SIZE).map((item) => ({ date: item.workDate.slice(8,10), subject: item.subject, location: item.location || "—", amount: wholeBaht.format(item.perDiem ?? 0) }));
   const title = `ตารางสรุปเดือน${new Intl.DateTimeFormat("th-TH", { month: "long", timeZone: "Asia/Bangkok" }).format(new Date(`${month}-01T00:00:00+07:00`))}`;
   const subtitle = active.name;
   return {
-    text: rows.length ? `${title}\n${subtitle}\n${rows.map((row) => `${row.date} ${row.subject} · ${row.amount} บาท`).join("\n")}\nเบี้ยเลี้ยงทั้งหมด ${total} บาท` : `ยังไม่มีรายการที่ยืนยันบันทึกในเดือน ${month} ครับ`,
+    text: rows.length ? `${title}\n${subtitle}\n${rows.map((row) => `${row.date} ${row.subject} · ${row.amount} บาท`).join("\n")}\nเบิกค่าใช้จ่ายทั้งหมด ${total} บาท` : `ยังไม่มีรายการที่ยืนยันบันทึกในเดือน ${month} ครับ`,
     ...(rows.length ? { table: { title, subtitle, rows, total } } : {}),
     buttons: [
       ...(offset ? [{ label: "ก่อนหน้า", data: `summary:${month}:${Math.max(0, offset - SUMMARY_PAGE_SIZE)}` }] : []),

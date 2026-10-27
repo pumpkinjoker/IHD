@@ -10,22 +10,32 @@ import { evidenceFileName } from "@/lib/images/evidence-file-name";
 import { expenseWorkItemSchema } from "@/schemas/expense-request-form.schema";
 import type { EvidenceImage } from "@/types/expense-request";
 import { bangkokDate } from "@/lib/line/intake";
+import { resolveReportEditScope } from "@/lib/reports/edit-scope";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-const scopeSchema = z.object({ employeeId: z.string().regex(/^\d{8}$/), month: z.string().refine(validMonth).optional() });
+const scopeSchema = z.object({ employeeId: z.string().regex(/^\d{8}$/).optional(), month: z.string().refine(validMonth).optional(), reportToken: z.string().regex(/^[A-Za-z0-9_-]{22}$/).optional() });
 const json = (data: unknown, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
+class ScopeError extends Error { constructor(message: string, readonly status = 400) { super(message); } }
+async function requestedScope(input: z.infer<typeof scopeSchema>) {
+  const linked = input.reportToken ? await resolveReportEditScope(input.reportToken) : null;
+  if (input.reportToken && !linked) throw new ScopeError("ลิงก์หมดอายุหรือข้อมูลถูกล้างแล้ว กรุณาขอลิงก์ใหม่", 403);
+  const month = linked?.month ?? bangkokDate(new Date()).slice(0, 7);
+  const employeeId = linked?.employeeId ?? input.employeeId;
+  if (!employeeId) throw new ScopeError("กรุณาเลือกพนักงาน");
+  if ((input.employeeId && input.employeeId !== employeeId) || (input.month && input.month !== month)) throw new ScopeError("รายการต้องเป็นของพนักงานและเดือนเดียวกับเอกสาร");
+  return { employeeId, month };
+}
 
 export async function GET(request: Request) {
   if (!allowsExpenseRecords(request)) return json({ error: "เว็บยังไม่พร้อมเชื่อมฐานข้อมูล กรุณาติดต่อผู้ดูแล" }, 503);
-  const scope = scopeSchema.safeParse(Object.fromEntries(new URL(request.url).searchParams));
+  const scope = scopeSchema.safeParse({ ...Object.fromEntries(new URL(request.url).searchParams), ...(request.headers.get("x-report-token") ? { reportToken: request.headers.get("x-report-token") } : {}) });
   if (!scope.success) return json({ error: "กรุณาเลือกพนักงาน" }, 400);
-  const month = bangkokDate(new Date()).slice(0, 7);
-  if (scope.data.month && scope.data.month !== month) return json({ error: "เปิดรายการได้เฉพาะเดือนปัจจุบัน" }, 400);
   try {
+    const { employeeId, month } = await requestedScope(scope.data);
     const store = configuredLineStore();
     if (!(store instanceof SupabaseLineStore)) return json({ error: "ยังไม่ได้เชื่อม Supabase" }, 503);
-    const employee = await store.findEmployee(scope.data.employeeId);
+    const employee = await store.findEmployee(employeeId);
     if (!employee?.active) return json({ error: "ไม่พบพนักงาน" }, 404);
     const rows = await store.employeeEntries(employee.employeeId, month);
     const archive = configuredEvidenceArchive();
@@ -47,8 +57,8 @@ export async function GET(request: Request) {
       items.push({ ...createDefaultExpenseWorkItem(), ...row.data.expense, id: row.id,
         workDate: row.data.workDate, subject: row.data.subject, location: row.data.location, evidenceImage, evidenceExpired });
     }
-    return json({ items, month });
-  } catch { return json({ error: "โหลดรายการหรือรูปไม่สำเร็จ กรุณาลองอีกครั้ง" }, 503); }
+    return json({ items, month, employeeId });
+  } catch (error) { return error instanceof ScopeError ? json({ error: error.message }, error.status) : json({ error: "โหลดรายการหรือรูปไม่สำเร็จ กรุณาลองอีกครั้ง" }, 503); }
 }
 
 export async function POST(request: Request) {
@@ -73,9 +83,9 @@ export async function POST(request: Request) {
     } finally { await reader.cancel(); }
     const parsed = scopeSchema.extend({ item: expenseWorkItemSchema }).safeParse(JSON.parse(Buffer.concat(chunks).toString("utf8")));
     if (!parsed.success) return json({ error: "กรุณาตรวจสอบข้อมูลและรูปหลักฐาน" }, 400);
-    const { employeeId, item } = parsed.data;
-    const month = bangkokDate(new Date()).slice(0, 7);
-    if ((parsed.data.month && parsed.data.month !== month) || !item.workDate.startsWith(`${month}-`) || new Date(`${item.workDate}T00:00:00Z`).toISOString().slice(0, 10) !== item.workDate) return json({ error: "วันที่ต้องอยู่ในเดือนปัจจุบัน" }, 400);
+    const { item } = parsed.data;
+    const { employeeId, month } = await requestedScope(parsed.data);
+    if (!item.workDate.startsWith(`${month}-`) || new Date(`${item.workDate}T00:00:00Z`).toISOString().slice(0, 10) !== item.workDate) return json({ error: "วันที่ต้องอยู่ในเดือนของเอกสาร" }, 400);
     lease = randomUUID();
     if (!await store.claimMedia(lease)) { lease = undefined; return json({ error: "กำลังบันทึกรายการอื่น กรุณาลองใหม่" }, 409); }
     const [employee, rows] = await Promise.all([store.findEmployee(employeeId), store.employeeEntries(employeeId, month)]);
@@ -101,6 +111,6 @@ export async function POST(request: Request) {
     // An old spare file is harmless if cleanup fails after the database commits.
     await change?.commit().catch(() => undefined);
     return json({ saved: true });
-  } catch { return json({ error: "บันทึกไม่สำเร็จ อาจมีวันที่ซ้ำหรือข้อมูลเปลี่ยนไป กรุณาโหลดข้อมูลใหม่" }, 409); }
+  } catch (error) { return error instanceof ScopeError ? json({ error: error.message }, error.status) : json({ error: "บันทึกไม่สำเร็จ อาจมีวันที่ซ้ำหรือข้อมูลเปลี่ยนไป กรุณาโหลดข้อมูลใหม่" }, 409); }
   finally { if (lease) await store.releaseMedia(lease).catch(() => undefined); }
 }

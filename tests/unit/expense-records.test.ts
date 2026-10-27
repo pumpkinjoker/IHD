@@ -5,6 +5,7 @@ import { LocalEvidenceArchive } from "@/lib/line/local-archive";
 import { SupabaseEvidenceArchive, EvidenceExpiredError } from "@/lib/line/supabase-archive";
 import { createDefaultExpenseWorkItem } from "@/lib/expense-request/form-defaults";
 import { GET, POST } from "@/app/api/expense-records/route";
+import * as reportScopes from "@/lib/reports/edit-scope";
 
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=", "base64");
 const entry = { workDate: "2026-10-26", subject: "จาก LINE", location: "สำนักงาน", imageId: `local:${"a".repeat(64)}`, employeeId: "12345678", employeeName: "คนทดสอบ" };
@@ -44,6 +45,25 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllEnvs(); vi.clearAllMocks(); });
 
 describe("original expense form data API", () => {
+  it("allows a previous-month report token to reopen and edit only that employee/month", async () => {
+    vi.setSystemTime(new Date("2026-11-01T01:00:00Z"));
+    vi.spyOn(reportScopes, "resolveReportEditScope").mockResolvedValue({ employeeId: entry.employeeId, month: "2026-10" });
+    const token = "a".repeat(22);
+    expect((await GET(request())).status).toBe(400);
+    const opened = await GET(new Request("http://127.0.0.1:3000/api/expense-records", { headers: { "x-report-token": token } }));
+    expect(opened.status).toBe(200);
+    expect(await opened.json()).toMatchObject({ employeeId: entry.employeeId, month: "2026-10" });
+    const saved = await POST(request({ employeeId: entry.employeeId, month: "2026-10", reportToken: token, item: { ...item(), accommodation: 1200 } }));
+    expect(saved.status).toBe(200);
+    expect(updateBody).toMatchObject({ data: { expense: { accommodation: 1200 } } });
+    expect((await POST(request({ employeeId: "87654321", month: "2026-10", reportToken: token, item: item() }))).status).toBe(400);
+    expect((await POST(request({ employeeId: entry.employeeId, month: "2026-11", reportToken: token, item: item() }))).status).toBe(400);
+  });
+  it("rejects expired or unknown report edit tokens before touching evidence", async () => {
+    vi.spyOn(reportScopes, "resolveReportEditScope").mockResolvedValue(null);
+    expect((await POST(request({ employeeId: entry.employeeId, month: "2026-10", reportToken: "a".repeat(22), item: item() }))).status).toBe(403);
+    expect(LocalEvidenceArchive.prototype.editEvidence).not.toHaveBeenCalled();
+  });
   it("keeps text and costs editable after monthly image expiry", async () => {
     const archive = new SupabaseEvidenceArchive("https://example.supabase.co", "server-only");
     vi.spyOn(config, "configuredEvidenceArchive").mockReturnValue(archive);

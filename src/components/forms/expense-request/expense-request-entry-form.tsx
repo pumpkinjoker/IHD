@@ -20,7 +20,7 @@ import { SearchableDropdown } from "@/components/ui/searchable-dropdown";
 import { calculateExpenseRowTotal, calculateGrandTotal } from "@/lib/calculations/expense";
 import { createDefaultExpenseRequestForm, createDefaultExpenseWorkItem } from "@/lib/expense-request/form-defaults";
 import { processEvidenceImage } from "@/lib/images/process-evidence-image";
-import { findTeamByKey, getRequesterKey, masterData } from "@/lib/master-data";
+import { findTeamByKey, findTeamByRequesterKey, getRequesterKey, masterData } from "@/lib/master-data";
 import { formatMoney } from "@/lib/money/format-money";
 import { toThaiBahtText } from "@/lib/money/thai-baht-text";
 import { cn } from "@/lib/utils";
@@ -61,6 +61,7 @@ type WorkItemEditorProps = {
   fieldId: string;
   form: UseFormReturn<ExpenseRequestForm>;
   onRemove: () => void;
+  month: string;
 };
 
 function WorkItemEditor({
@@ -69,7 +70,8 @@ function WorkItemEditor({
   canRemove,
   fieldId,
   form,
-  onRemove
+  onRemove,
+  month
 }: WorkItemEditorProps) {
   const [imageError, setImageError] = useState<string>();
   const [isDraggingEvidence, setIsDraggingEvidence] = useState(false);
@@ -81,7 +83,7 @@ function WorkItemEditor({
   const itemErrors = errors.workItems?.[index];
   const rowTotal = calculateExpenseRowTotal(item);
   const imageInputId = `evidence-${fieldId}`;
-  const workMonth = bangkokDate(new Date()).slice(0, 7);
+  const workMonth = month;
   const monthEnd = new Date(Date.UTC(Number(workMonth.slice(0, 4)), Number(workMonth.slice(5)), 0)).toISOString().slice(0, 10);
 
   async function handleEvidenceFile(file: File | null) {
@@ -432,8 +434,8 @@ export function ExpenseRequestEntryForm() {
   const router = useRouter();
   const storageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isRestored, setIsRestored] = useState(false);
-  const month = bangkokDate(new Date()).slice(0, 7);
-  const [cloudScope, setCloudScope] = useState<{ employeeId: string; month: string } | null>(null);
+  const [cloudScope, setCloudScope] = useState<{ employeeId: string; month: string; reportToken?: string } | null>(null);
+  const month = cloudScope?.month ?? bangkokDate(new Date()).slice(0, 7);
   const [cloudBusy, setCloudBusy] = useState(false);
   const [cloudMessage, setCloudMessage] = useState("");
   const form = useForm<ExpenseRequestForm>({
@@ -486,26 +488,48 @@ export function ExpenseRequestEntryForm() {
   const grandTotal = calculateGrandTotal(watchedItems ?? []);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
+    const abort = new AbortController();
+    const restore = async () => {
+      const reportToken = new URLSearchParams(window.location.hash.slice(1)).get("report");
+      if (reportToken) {
+        setCloudBusy(true);
+        setCloudMessage("กำลังเปิดรายการของเอกสาร…");
+        try {
+          if (!/^[A-Za-z0-9_-]{22}$/.test(reportToken)) throw new Error("ลิงก์แก้ไขเอกสารไม่ถูกต้อง");
+          const response = await fetch("/api/expense-records", { headers: { "x-report-token": reportToken }, cache: "no-store", signal: abort.signal });
+          const result = await recordsResponse(response);
+          const team = findTeamByRequesterKey(result.employeeId);
+          if (!team || !/^\d{4}-(0[1-9]|1[0-2])$/.test(result.month) || !Array.isArray(result.items) || result.items.some((item: ExpenseWorkItem) => !item.workDate?.startsWith(`${result.month}-`))) throw new Error("ข้อมูลเอกสารไม่ครบ กรุณาติดต่อผู้ดูแล");
+          if (!result.items.length) throw new Error("ไม่พบรายการในเดือนของเอกสาร");
+          if (abort.signal.aborted) return;
+          reset({ teamKey: team.key, requesterKey: result.employeeId, documentDate: bangkokDate(new Date()), workItems: result.items });
+          const scope = { employeeId: result.employeeId, month: result.month, reportToken };
+          setCloudScope(scope);
+          try { sessionStorage.setItem(CLOUD_SCOPE_KEY, JSON.stringify(scope)); } catch {}
+          setCloudMessage(`โหลดแล้ว ${result.items.length} รายการ แก้ไขข้อมูลในฟอร์มด้านล่างได้เลย`);
+        } catch (error) {
+          if (!abort.signal.aborted) setCloudMessage(error instanceof Error ? error.message : "เปิดเอกสารไม่สำเร็จ");
+        } finally {
+          if (!abort.signal.aborted) { setCloudBusy(false); setIsRestored(true); }
+        }
+        return;
+      }
       const storedDraft = readExpenseRequestDraft();
-
       if (storedDraft) {
         const currentMonth = bangkokDate(new Date()).slice(0, 7);
-        const workItems = storedDraft.data.workItems.filter((item) => !item.workDate || item.workDate.startsWith(`${currentMonth}-`));
+        let scope: { employeeId: string; month: string; reportToken?: string } | null = null;
+        try { scope = JSON.parse(sessionStorage.getItem(CLOUD_SCOPE_KEY) || "null"); } catch {}
+        const linked = scope?.employeeId === storedDraft.data.requesterKey && /^[A-Za-z0-9_-]{22}$/.test(scope?.reportToken || "") && /^\d{4}-(0[1-9]|1[0-2])$/.test(scope?.month || "");
+        const draftMonth = linked ? scope!.month : currentMonth;
+        const workItems = storedDraft.data.workItems.filter((item) => !item.workDate || item.workDate.startsWith(`${draftMonth}-`));
         reset({ ...storedDraft.data, workItems: workItems.length ? workItems : [createDefaultExpenseWorkItem()] });
-        try {
-          const scope = JSON.parse(sessionStorage.getItem(CLOUD_SCOPE_KEY) || "null");
-          if (scope && scope.employeeId === storedDraft.data.requesterKey && scope.month === currentMonth
-            && storedDraft.data.workItems.every((item) => item.workDate.startsWith(`${scope.month}-`))) {
-            setCloudScope(scope);
-          }
-        } catch { /* The form still works when browser storage is unavailable. */ }
+        if (scope && scope.employeeId === storedDraft.data.requesterKey && scope.month === draftMonth
+          && storedDraft.data.workItems.every((item) => item.workDate.startsWith(`${draftMonth}-`))) setCloudScope(scope);
       }
-
       setIsRestored(true);
-    }, 0);
-
-    return () => window.clearTimeout(timer);
+    };
+    const timer = window.setTimeout(() => { void restore(); }, 0);
+    return () => { window.clearTimeout(timer); abort.abort(); };
   }, [reset]);
 
   useEffect(() => {
@@ -530,6 +554,7 @@ export function ExpenseRequestEntryForm() {
 
   function handleReset() {
     try { sessionStorage.removeItem(CLOUD_SCOPE_KEY); } catch {}
+    window.history.replaceState(null, "", window.location.pathname);
     setCloudScope(null);
     setCloudMessage("");
     clearExpenseRequestDraft();
@@ -554,7 +579,7 @@ export function ExpenseRequestEntryForm() {
     let saved = 0;
     try {
       if (new Set(data.workItems.map((item) => item.workDate)).size !== data.workItems.length) throw new Error("บันทึกได้วันละหนึ่งงาน กรุณาตรวจสอบวันที่ซ้ำ");
-      if (cloudScope.month !== bangkokDate(new Date()).slice(0, 7) || data.workItems.some((item) => !item.workDate.startsWith(`${cloudScope.month}-`))) throw new Error("วันที่ต้องอยู่ในเดือนปัจจุบัน กรุณาเปิดรายการใหม่");
+      if ((!cloudScope.reportToken && cloudScope.month !== bangkokDate(new Date()).slice(0, 7)) || data.workItems.some((item) => !item.workDate.startsWith(`${cloudScope.month}-`))) throw new Error("วันที่ต้องอยู่ในเดือนของเอกสาร กรุณาเปิดรายการใหม่");
       for (const item of data.workItems) {
         const response = await fetch("/api/expense-records", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...cloudScope, item }) });
         await recordsResponse(response);
@@ -586,8 +611,8 @@ export function ExpenseRequestEntryForm() {
   }
 
   async function handleValidSubmit(data: ExpenseRequestForm) {
-    if (data.workItems.some((item) => !item.workDate.startsWith(`${bangkokDate(new Date()).slice(0, 7)}-`))) {
-      setCloudMessage("วันที่ปฏิบัติงานต้องอยู่ในเดือนปัจจุบัน");
+    if (data.workItems.some((item) => !item.workDate.startsWith(`${cloudScope?.month ?? bangkokDate(new Date()).slice(0, 7)}-`))) {
+      setCloudMessage("วันที่ปฏิบัติงานต้องอยู่ในเดือนของเอกสาร");
       return;
     }
     if (!await saveCloud(data)) return;
@@ -670,7 +695,7 @@ export function ExpenseRequestEntryForm() {
         <div className="mt-5 flex flex-wrap items-center gap-3">
           <p className="text-sm text-muted-foreground">รายการเดือน {month}</p>
           <Button disabled={!selectedRequester || !month || Boolean(cloudScope)} onClick={() => void loadCloud()} variant="outline">เปิดรายการที่บันทึกไว้</Button>
-          {cloudScope && <Button variant="ghost" onClick={() => { try { sessionStorage.removeItem(CLOUD_SCOPE_KEY); } catch {} setCloudScope(null); setCloudMessage(""); setValue("workItems", [createDefaultExpenseWorkItem()]); }}>เปลี่ยนผู้ขอเบิก</Button>}
+          {cloudScope && <Button variant="ghost" onClick={() => { try { sessionStorage.removeItem(CLOUD_SCOPE_KEY); } catch {} window.history.replaceState(null, "", window.location.pathname); setCloudScope(null); setCloudMessage(""); setValue("workItems", [createDefaultExpenseWorkItem()]); }}>เปลี่ยนผู้ขอเบิก</Button>}
         </div>
         {cloudMessage && <p role="status" className="mt-3 text-sm">{cloudMessage}</p>}
 
@@ -727,6 +752,7 @@ export function ExpenseRequestEntryForm() {
               form={form}
               index={index}
               item={watchedItems?.[index] ?? field}
+              month={month}
               key={field.id}
               onRemove={() => remove(index)}
             />

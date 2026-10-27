@@ -3,6 +3,7 @@ import type { SupabaseLineStore } from "./store";
 import type { IntakeEmployee } from "./employee-intake";
 import type { IntakeReply } from "./intake";
 import { validMonth } from "./records";
+import { calculateExpenseRowTotal, calculateGrandTotal } from "@/lib/calculations/expense";
 
 export const SUMMARY_PAGE_SIZE = 5;
 const wholeBaht = new Intl.NumberFormat("th-TH", { maximumFractionDigits: 0 });
@@ -29,8 +30,8 @@ export async function summaryReply(store: Pick<SupabaseLineStore, "employeeEntri
   if (!active?.active) return { text: "ไม่พบพนักงานที่ใช้งานอยู่ กรุณาตรวจสอบรหัสพนักงานครับ", buttons: [] };
   const entries = await store.employeeEntries(active.employeeId, month);
   const items = entries.map(reportWorkItem);
-  const total = wholeBaht.format(items.reduce((sum, item) => sum + (item.perDiem ?? 0), 0));
-  const rows = items.slice(offset, offset + SUMMARY_PAGE_SIZE).map((item) => ({ date: item.workDate.slice(8,10), subject: item.subject, location: item.location || "—", amount: wholeBaht.format(item.perDiem ?? 0) }));
+  const total = wholeBaht.format(calculateGrandTotal(items));
+  const rows = items.slice(offset, offset + SUMMARY_PAGE_SIZE).map((item) => ({ date: item.workDate.slice(8,10), subject: item.subject, location: item.location || "—", amount: wholeBaht.format(calculateExpenseRowTotal(item)) }));
   const title = `ตารางสรุปเดือน${new Intl.DateTimeFormat("th-TH", { month: "long", timeZone: "Asia/Bangkok" }).format(new Date(`${month}-01T00:00:00+07:00`))}`;
   const subtitle = active.name;
   return {

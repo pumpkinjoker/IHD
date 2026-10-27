@@ -29,7 +29,7 @@ export const monthlyReportSchema = z.object({
 });
 export type MonthlyReport = z.infer<typeof monthlyReportSchema>;
 export function monthlyReportTitle(month: string) {
-  return `สรุปยอดเบิกเบี้ยเลี้ยงเดือน${new Intl.DateTimeFormat("th-TH", { month: "long", year: "numeric", timeZone: "Asia/Bangkok" }).format(new Date(`${month}-01T00:00:00+07:00`))}`;
+  return `สรุปยอดเบิกค่าใช้จ่ายเดือน${new Intl.DateTimeFormat("th-TH", { month: "long", year: "numeric", timeZone: "Asia/Bangkok" }).format(new Date(`${month}-01T00:00:00+07:00`))}`;
 }
 export function reportRequester(employee: { employee_id: string; name: string; email: string; team: string; position: string }): TeamMember {
   const [firstName, ...rest] = employee.name.trim().split(/\s+/);

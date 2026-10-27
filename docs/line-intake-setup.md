@@ -366,7 +366,7 @@ Report JSON, image copies and outbox rows are deleted with the original work
 month by the existing cleanup task. January summaries expire on March 1.
 
 The requested mail sender is inhouse.mkt@toagroup.com, with the subject
-“สรุปยอดเบิกเบี้ยเลี้ยงเดือน…”. Sending email from that account is not enabled:
+“สรุปยอดเบิกค่าใช้จ่ายเดือน…”. Sending email from that account is not enabled:
 no SMTP, OAuth or mail provider has been authorized. The user chose the LINE
 web-summary fallback. No real employee messages are sent by QA; the cloud smoke
 test intercepts LINE transport and removes all of its temporary objects and rows.
@@ -376,8 +376,8 @@ test intercepts LINE transport and removes all of its temporary objects and rows
 Set `LINE_TEST_SUMMARY_ENABLED=true` on the webhook server using the Supabase
 store. Type **เมนู** or **ดูสรุปตาราง** in the OA to see the test summary button.
 The Flex table shows the bound employee's confirmed entries in the current
-Bangkok month: date, subject/location, daily allowance and the complete month's
-allowance total. Saved web amounts override the 300/day default. Five rows are
+Bangkok month: day, subject/location, daily expenses and the complete month's
+expense total, including accommodation and other cost fields. Saved web amounts override the 300/day default. Five rows are
 shown per page; current drafts and the real monthly delivery remain unchanged.
 An explicit month is accepted as `ดูสรุปตาราง YYYY-MM`. Buttons use the same
 per-conversation context checks as the existing intake menus. Turn the flag off
@@ -386,8 +386,8 @@ without sending any test messages to real employees.
 
 The test table also offers **ขอลิงก์สรุป** (or type that command directly).
 This creates a private web preview for the bound employee and selected month,
-with signed evidence URLs and a lifetime of at most 24 hours. The page marks it
-as a test preview and supports Save as PDF. Preview JSON is tracked separately
+with signed evidence URLs and a lifetime of at most 24 hours. The page opens
+the same document preview layout as the web form and supports Save as PDF. Preview JSON is tracked separately
 in `line_summary_previews`, so it cannot replace or suppress the final monthly
 outbox. The existing cleanup deletes expired preview objects and registry rows
 at the start of the third month. No public table access is granted.
@@ -399,3 +399,11 @@ a report-only signed URL valid for at most 60 seconds; the token keeps the origi
 report expiry. Cleanup removes expired tokens daily. Existing long links still work.
 When editing a draft's work date in LINE, enter only the day (`7`, `27`); the month
 and year remain those of the draft. Invalid days and future dates are rejected.
+
+The report toolbar includes **แก้ไขเอกสาร**, which opens the existing form with
+live database records for that link's employee and month. The API validates the
+token hash and expiry on reads and writes; a valid previous-month report may be
+edited without enabling arbitrary month selection. The token travels in a URL
+fragment, then a request header/body. Cost edits save to the existing work rows.
+The monthly message reports the complete expense total and omits the link-expiry
+sentence; expiry and retention rules still apply.

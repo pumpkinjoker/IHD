@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildMonthlyReport, monthlyPeriod, runMonthlyReports } from "../../supabase/functions/monthly-report-worker/index";
+import { buildMonthlyReport, monthlyPeriod, monthlyReportMessage, runMonthlyReports } from "../../supabase/functions/monthly-report-worker/index";
 import { monthlyReportSchema, isReportAsset } from "@/lib/reports/monthly-report";
 const token = `header.${btoa(JSON.stringify({ role: "service_role" }))}.signature`;
 const signed = "https://pqyvtdvskovhbsjduskr.supabase.co/storage/v1/object/sign/ihd-monthly-reports/test/20261001.png?token=sample";
 const job = { id: "11111111-1111-4111-8111-111111111111", period: "2026-10-01", employee_id: "12345678", line_user_id: "U" + "a".repeat(32),
   snapshot: { employee: { employee_id: "12345678", name: "คน ทดสอบ", email: "employee@example.com", team: "Team", position: "Position" },
     entries: [{ id: "one", data: { workDate: "2026-10-01", subject: "งานหนึ่ง", location: "สำนักงาน", imageId: "supabase:" + "a".repeat(64) } },
-      { id: "two", data: { workDate: "2026-10-02", subject: "งานสอง", location: "สำนักงาน", imageId: "supabase:" + "b".repeat(64), expense: { perDiem: 450, fare: 100 } } }] },
+      { id: "two", data: { workDate: "2026-10-02", subject: "งานสอง", location: "สำนักงาน", imageId: "supabase:" + "b".repeat(64), expense: { perDiem: 450, fare: 100, accommodation: 1000 } } }] },
   report_url: "https://ihd-gen.vercel.app/line/monthly#private-link", push_text: "frozen report message", retry_key: "22222222-2222-4222-8222-222222222222", expires_at: "2026-11-30T17:00:00Z" };
 const request = (dryRun = false) => new Request("https://worker.example", { method: "POST", headers: { authorization: `Bearer ${token}` }, body: JSON.stringify({ dryRun }) });
 
@@ -22,6 +22,11 @@ describe("monthly personal report", () => {
     expect(report.draft.workItems.map((item) => item.perDiem)).toEqual([300,450]);
     expect(report.requester.email).toBe("employee@example.com");
     expect(report.draft.documentDate).toBe("2026-11-01");
+    const message = monthlyReportMessage(report, "https://ihd-gen.vercel.app/s#sample");
+    expect(message).toContain("สรุปยอดเบิกค่าใช้จ่ายเดือนตุลาคม 2569");
+    expect(message).toContain("เบิกค่าใช้จ่ายรวม 1,850 บาท");
+    expect(message).not.toContain("เบี้ยเลี้ยง");
+    expect(message).not.toContain("รอบล้าง");
     expect(() => buildMonthlyReport({ ...job, employee_id: "87654321" }, [])).toThrow();
     expect(isReportAsset("https://other.example/file.json?token=sample")).toBe(false);
     expect(isReportAsset("https://pqyvtdvskovhbsjduskr.supabase.co/storage/v1/object/public/ihd-monthly-reports/report.json")).toBe(false);

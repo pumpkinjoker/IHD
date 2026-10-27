@@ -1,22 +1,25 @@
 "use client";
 
-import { ArrowLeft, Download, FilePlus2, Printer } from "lucide-react";
+import { ArrowLeft, Download, FilePlus2, Pencil, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function ExpensePreviewToolbar({
   onBack,
   onCreateNew,
+  onEdit,
   onPrint,
   printNotice
 }: {
   onBack?: () => void;
   onCreateNew?: () => void;
+  onEdit?: () => void;
   onPrint: (mode: "download" | "print") => void;
   printNotice?: string;
 }) {
   return (
     <div className="expense-floating-toolbar-wrap no-print">
       <div className="expense-floating-toolbar">
+        {onEdit && <Button onClick={onEdit} size="sm" variant="outline"><Pencil aria-hidden="true" className="size-4" />แก้ไขเอกสาร</Button>}
         {onBack && <Button onClick={onBack} size="sm" variant="outline">
           <ArrowLeft aria-hidden="true" className="size-4" />
           ย้อนกลับ

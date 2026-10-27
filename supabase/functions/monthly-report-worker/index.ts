@@ -14,7 +14,7 @@ export function buildMonthlyReport(job: Job, images: Image[]) {
   if (employee.employee_id !== job.employee_id || images.length !== job.snapshot.entries.length || !images.length) throw new Error("Report ownership mismatch");
   const [firstName, ...rest] = employee.name.trim().split(/\s+/);
   const month = job.period.slice(0, 7);
-  const title = `สรุปยอดเบิกเบี้ยเลี้ยงเดือน${new Intl.DateTimeFormat("th-TH", { month: "long", year: "numeric", timeZone: "Asia/Bangkok" }).format(new Date(`${month}-01T00:00:00+07:00`))}`;
+  const title = `สรุปยอดเบิกค่าใช้จ่ายเดือน${new Intl.DateTimeFormat("th-TH", { month: "long", year: "numeric", timeZone: "Asia/Bangkok" }).format(new Date(`${month}-01T00:00:00+07:00`))}`;
   const nextMonth = new Date(`${job.period}T00:00:00Z`); nextMonth.setUTCMonth(nextMonth.getUTCMonth() + 1);
   const workItems = job.snapshot.entries.map((row, index) => ({
     startTime: "08:00", endTime: "17:00", travelFrom: "", travelTo: "", totalKilometers: null, fare: null, accommodation: null,
@@ -25,6 +25,11 @@ export function buildMonthlyReport(job: Job, images: Image[]) {
   return { version: 1, month, title, expiresAt: new Date(job.expires_at).toISOString(),
     requester: { employeeId: employee.employee_id, firstName, lastName: rest.join(" "), name: employee.name, email: employee.email, position: employee.position, department: employee.team },
     draft: { teamKey: employee.team, requesterKey: employee.employee_id, documentDate: nextMonth.toISOString().slice(0, 10), workItems } };
+}
+
+export function monthlyReportMessage(report: ReturnType<typeof buildMonthlyReport>, reportUrl: string) {
+  const total = report.draft.workItems.reduce((sum, item) => sum + [item.fare, item.accommodation, item.perDiem, item.entertainment, item.otherExpense].reduce<number>((subtotal, amount) => subtotal + Number(amount || 0), 0), 0);
+  return `${report.title}\n${report.requester.name}\n${report.draft.workItems.length} วัน · เบิกค่าใช้จ่ายรวม ${total.toLocaleString("th-TH", { maximumFractionDigits: 0 })} บาท\n\nเปิดสรุปและบันทึก PDF ตามแบบฟอร์มเดิม:\n${reportUrl}`;
 }
 
 export async function runMonthlyReports(request: Request, env: { url: string }, transport: typeof fetch = fetch, now = new Date()) {
@@ -103,8 +108,7 @@ export async function runMonthlyReports(request: Request, env: { url: string }, 
           const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(shortToken))), (byte) => byte.toString(16).padStart(2, "0")).join("");
           await api("rest/v1/line_report_links", "POST", { token_hash: hash, employee_id: job.employee_id, period: job.period, object_path: reportPath, expires_at: job.expires_at });
           const reportUrl = `${config.appOrigin}/s#${shortToken}`;
-          const perDiem = report.draft.workItems.reduce((sum, item) => sum + Number(item.perDiem || 0), 0);
-          const message = `${report.title}\n${report.requester.name}\n${report.draft.workItems.length} วัน · เบี้ยเลี้ยงรวม ${perDiem.toLocaleString("th-TH")} บาท\n\nเปิดสรุปและบันทึก PDF ตามแบบฟอร์มเดิม:\n${reportUrl}\n\nลิงก์ส่วนตัวนี้ใช้ได้ถึงก่อนรอบล้างข้อมูลเดือนที่ 3`;
+          const message = monthlyReportMessage(report, reportUrl);
           if (message.length > 5000) throw new Error("Report link too long");
           await update({ report_url: reportUrl, push_text: message });
           job.report_url = reportUrl; job.push_text = message;

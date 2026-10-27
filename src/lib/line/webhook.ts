@@ -41,23 +41,23 @@ export function toLineMessage(reply: IntakeReply) {
     const table = reply.table;
     // Keep the compact 12px table, with room around Thai combining marks.
     const text = (value: string, extra: Record<string, unknown> = {}) => {
-      const { flex, ...style } = extra;
-      return { type: "box", layout: "vertical", paddingTop: "3px", paddingBottom: "3px", ...(flex === undefined ? {} : { flex }),
+      const { flex, margin, ...style } = extra;
+      return { type: "box", layout: "vertical", paddingTop: "3px", paddingBottom: "3px", ...(flex === undefined ? {} : { flex }), ...(margin === undefined ? {} : { margin }),
         contents: [{ type: "text", text: value || "—", size: "12px", wrap: true, lineSpacing: "10px", ...style }] };
     };
     const column = (value: string, width: string, extra: Record<string, unknown> = {}) => ({ type: "box", layout: "vertical", width, flex: 0, contents: [text(value, extra)] });
     return {
       type: "flex" as const, altText: reply.text.slice(0, 400),
       contents: { type: "bubble", size: "mega", body: { type: "box", layout: "vertical", paddingAll: "16px", spacing: "8px", contents: [
-        text(table.title, { size: "16px", weight: "bold" }), text(table.subtitle, { color: "#666666" }),
+        { type: "box", layout: "vertical", spacing: "2px", contents: [text(table.title, { size: "16px", weight: "bold" }), text(table.subtitle, { color: "#666666" })] },
         { type: "separator" },
-        { type: "box", layout: "horizontal", spacing: "sm", contents: [column("วันที่", "36px", { weight: "bold" }), text("รายการ / สถานที่", { flex: 1, weight: "bold" }), column("เบี้ยเลี้ยง", "76px", { align: "end", weight: "bold" })] },
+        { type: "box", layout: "horizontal", spacing: "sm", margin: "14px", contents: [column("วันที่", "36px", { weight: "bold" }), text("รายการ / สถานที่", { flex: 1, weight: "bold" }), column("เบี้ยเลี้ยง", "76px", { align: "end", weight: "bold" })] },
         ...table.rows.map((row) => ({ type: "box", layout: "horizontal", spacing: "sm", contents: [
           column(row.date, "36px", { wrap: false }),
           { type: "box", layout: "vertical", flex: 1, spacing: "4px", contents: [text(row.subject), text(row.location, { color: "#777777" })] },
           column(row.amount, "76px", { align: "end", wrap: false })
         ] })),
-        { type: "separator" }, text(`เบี้ยเลี้ยงทั้งหมด ${table.total} บาท`, { weight: "bold" })
+        { type: "separator" }, text(`เบี้ยเลี้ยงทั้งหมด ${table.total} บาท`, { weight: "bold", margin: "14px" })
       ] } },
       ...(reply.buttons.length ? { quickReply: { items: reply.buttons.map((button) => ({ type: "action", action: { type: "postback", label: button.label, data: button.data, displayText: button.label } })) } } : {})
     };

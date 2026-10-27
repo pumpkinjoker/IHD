@@ -31,7 +31,7 @@ export async function summaryReply(store: Pick<SupabaseLineStore, "employeeEntri
   const items = entries.map(reportWorkItem);
   const total = formatMoney(items.reduce((sum, item) => sum + (item.perDiem ?? 0), 0));
   const rows = items.slice(offset, offset + SUMMARY_PAGE_SIZE).map((item) => ({ date: item.workDate.slice(8,10), subject: item.subject, location: item.location || "—", amount: formatMoney(item.perDiem ?? 0) }));
-  const title = `ตารางสรุป${new Intl.DateTimeFormat("th-TH", { month: "long", timeZone: "Asia/Bangkok" }).format(new Date(`${month}-01T00:00:00+07:00`))}`;
+  const title = `ตารางสรุปเดือน${new Intl.DateTimeFormat("th-TH", { month: "long", timeZone: "Asia/Bangkok" }).format(new Date(`${month}-01T00:00:00+07:00`))}`;
   const subtitle = active.name;
   return {
     text: rows.length ? `${title}\n${subtitle}\n${rows.map((row) => `${row.date} ${row.subject} · ${row.amount} บาท`).join("\n")}\nเบี้ยเลี้ยงทั้งหมด ${total} บาท` : `ยังไม่มีรายการที่ยืนยันบันทึกในเดือน ${month} ครับ`,

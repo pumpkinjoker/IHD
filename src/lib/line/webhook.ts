@@ -39,11 +39,15 @@ export function eventToIntakeAction(event: LineEvent): EmployeeIntakeAction | nu
 export function toLineMessage(reply: IntakeReply) {
   if (reply.table) {
     const table = reply.table;
-    // Keep the compact 12px table, with room around Thai combining marks.
+    // An invisible larger span reserves ascent/descent inside LINE's text line;
+    // visible text stays 12px. Outer box padding alone did not protect marks.
     const text = (value: string, extra: Record<string, unknown> = {}) => {
-      const { flex, margin, ...style } = extra;
-      return { type: "box", layout: "vertical", paddingTop: "3px", paddingBottom: "3px", ...(flex === undefined ? {} : { flex }), ...(margin === undefined ? {} : { margin }),
-        contents: [{ type: "text", text: value || "—", size: "12px", wrap: true, lineSpacing: "10px", ...style }] };
+      const { flex, margin, size = "12px", weight, color, compact = false, ...style } = extra;
+      const lineSize = size === "16px" ? "20px" : "16px";
+      const strut = { type: "span", text: "\u200B", size: lineSize };
+      return { type: "box", layout: "vertical", paddingTop: compact ? "0px" : "1px", paddingBottom: compact ? "0px" : "1px", ...(flex === undefined ? {} : { flex }), ...(margin === undefined ? {} : { margin }),
+        contents: [{ type: "text", size: lineSize, wrap: true, lineSpacing: "4px", ...style, contents: [strut,
+          { type: "span", text: value || "—", size, ...(weight === undefined ? {} : { weight }), ...(color === undefined ? {} : { color }) }, strut] }] };
     };
     const column = (value: string, width: string, extra: Record<string, unknown> = {}) => ({ type: "box", layout: "vertical", width, flex: 0, contents: [text(value, extra)] });
     return {
@@ -52,11 +56,11 @@ export function toLineMessage(reply: IntakeReply) {
         { type: "box", layout: "vertical", spacing: "2px", contents: [text(table.title, { size: "16px", weight: "bold" }), text(table.subtitle, { color: "#666666" })] },
         { type: "separator" },
         { type: "box", layout: "horizontal", spacing: "sm", margin: "14px", contents: [column("วันที่", "36px", { weight: "bold" }), text("รายการ / สถานที่", { flex: 1, weight: "bold" }), column("เบี้ยเลี้ยง", "76px", { align: "end", weight: "bold" })] },
-        ...table.rows.map((row) => ({ type: "box", layout: "horizontal", spacing: "sm", contents: [
-          column(row.date, "36px", { wrap: false }),
-          { type: "box", layout: "vertical", flex: 1, spacing: "4px", contents: [text(row.subject), text(row.location, { color: "#777777" })] },
-          column(row.amount, "76px", { align: "end", wrap: false })
-        ] })),
+        { type: "box", layout: "vertical", spacing: "16px", contents: table.rows.map((row) => ({ type: "box", layout: "horizontal", spacing: "sm", contents: [
+          column(row.date, "36px", { wrap: false, compact: true }),
+          { type: "box", layout: "vertical", flex: 1, spacing: "none", contents: [text(row.subject, { compact: true }), text(row.location, { color: "#777777", compact: true })] },
+          column(row.amount, "76px", { align: "end", wrap: false, compact: true })
+        ] })) },
         { type: "separator" }, text(`เบี้ยเลี้ยงทั้งหมด ${table.total} บาท`, { weight: "bold", margin: "14px" })
       ] } },
       ...(reply.buttons.length ? { quickReply: { items: reply.buttons.map((button) => ({ type: "action", action: { type: "postback", label: button.label, data: button.data, displayText: button.label } })) } } : {})

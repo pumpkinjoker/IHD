@@ -28,6 +28,7 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.11",
     "@eslint/eslintrc": "3.3.6",
     "@playwright/test": "1.61.1",
     "@types/node": "26.1.1",

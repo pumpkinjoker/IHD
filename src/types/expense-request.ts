@@ -22,6 +22,7 @@ export type ExpenseWorkItem = {
   entertainment: number | null;
   otherExpense: number | null;
   evidenceImage: EvidenceImage | null;
+  evidenceExpired?: boolean;
 };
 
 export type ExpenseRequestForm = {

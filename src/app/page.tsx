@@ -17,6 +17,7 @@ export default function Home() {
             subtitle="Expense Request"
             title="เอกสารเบิกเงิน"
           />
+          {process.env.NODE_ENV === "development" ? <DocumentTypeCard href="/line/records" title="ข้อมูลหน้างานรายเดือน" subtitle="ดูรายการและรูปของพนักงานในเดือนที่เลือก" /> : null}
         </div>
       </section>
     </main>

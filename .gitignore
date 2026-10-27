@@ -10,6 +10,8 @@ out/
 playwright-report/
 test-results/
 tmp/
+.local-data/
 tsconfig.tsbuildinfo
 .vercel
 docs/reference/
+supabase/.temp/

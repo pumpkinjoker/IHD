@@ -257,7 +257,7 @@ test("creates a preview with eleven expense items", async ({ page }) => {
     await page
       .getByLabel("วันที่ปฏิบัติงาน")
       .nth(index)
-      .fill("2026-09-03");
+      .fill(`2026-09-${String(index + 1).padStart(2, "0")}`);
     await page.getByLabel("หัวข้องาน").nth(index).fill(`รายการที่ ${index + 1}`);
     await page
       .locator('input[type="file"]')

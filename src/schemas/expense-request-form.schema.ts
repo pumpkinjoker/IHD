@@ -37,7 +37,8 @@ export const expenseWorkItemDraftSchema = z
     perDiem: optionalAmountSchema,
     entertainment: optionalAmountSchema,
     otherExpense: optionalAmountSchema,
-    evidenceImage: evidenceImageSchema.nullable()
+    evidenceImage: evidenceImageSchema.nullable(),
+    evidenceExpired: z.boolean().optional()
   })
   .strip();
 
@@ -76,7 +77,7 @@ export const expenseWorkItemSchema = expenseWorkItemDraftSchema.superRefine(
       });
     }
 
-    if (!item.evidenceImage) {
+    if (!item.evidenceImage && !item.evidenceExpired) {
       ctx.addIssue({
         code: "custom",
         path: ["evidenceImage"],
@@ -94,6 +95,11 @@ export const expenseRequestFormSchema = expenseRequestDraftDataSchema
     workItems: z.array(expenseWorkItemSchema).min(1, "กรุณาเพิ่มรายการงาน")
   })
   .superRefine((form, ctx) => {
+    const dates = new Set<string>();
+    form.workItems.forEach((item, index) => {
+      if (item.workDate && dates.has(item.workDate)) ctx.addIssue({ code: "custom", path: ["workItems", index, "workDate"], message: "บันทึกได้วันละหนึ่งงาน" });
+      dates.add(item.workDate);
+    });
     if (!form.documentDate) {
       ctx.addIssue({
         code: "custom",

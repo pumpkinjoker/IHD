@@ -15,11 +15,14 @@ test("opens a personal monthly summary and prints the existing form with all evi
     await route.fulfill({ json: { url: summaryUrl } });
   });
   await page.goto(`/s#${"a".repeat(22)}`);
-  await expect(page.getByRole("heading", { name: /สรุปยอดเบิกเบี้ยเลี้ยงเดือน/ })).toBeVisible();
-  await expect(page.getByText(/สรุปช่วงทดสอบ ณ ตอนเรียกดู/)).toBeVisible();
-  await expect(page.getByText("31 วัน · รวม 9,300.00 บาท")).toBeVisible();
+  await expect(page.locator(".expense-document-stack")).toBeVisible();
+  await expect(page.getByRole("button", { name: "ดาวน์โหลด PDF", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "พิมพ์เอกสาร", exact: true })).toBeVisible();
+  await expect(page.getByText(/สรุปช่วงทดสอบ ณ ตอนเรียกดู/)).toHaveCount(0);
+  await expect(page.getByText("31 วัน · รวม 9,300.00 บาท")).toHaveCount(0);
   await expect(page.locator("img[alt^='หลักฐานประกอบรายการที่']")).toHaveCount(31);
   await expect.poll(() => page.locator(".expense-document-stack img").evaluateAll((images) => images.every((image) => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0))).toBe(true);
+  await page.screenshot({ path: "test-results/monthly-report-preview-screen.png" });
   await page.emulateMedia({ media: "print" });
   await page.pdf({ path: "test-results/monthly-summary-sample.pdf", format: "A4", printBackground: true, preferCSSPageSize: true });
   await page.screenshot({ path: "test-results/monthly-summary-sample.png", fullPage: true });

@@ -1,9 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { ExpensePreviewToolbar } from "@/components/documents/expense-request/expense-preview-toolbar";
 import { DocumentPackagePreview } from "@/components/documents/expense-request/document-package-preview";
-import { calculateGrandTotal } from "@/lib/calculations/expense";
-import { formatMoney } from "@/lib/money/format-money";
 import { REPORT_STORAGE_ORIGIN, isReportAsset, monthlyReportSchema, type MonthlyReport } from "@/lib/reports/monthly-report";
 
 export function MonthlyReportView() {
@@ -31,25 +29,17 @@ export function MonthlyReportView() {
     })();
     return () => abort.abort();
   }, []);
-  if (!report) return <main className="mx-auto max-w-3xl p-8"><h1 className="text-2xl font-semibold">สรุปยอดเบิกเบี้ยเลี้ยง</h1><p role={error ? "alert" : "status"} className="mt-4">{error || "กำลังเปิดรายงานส่วนตัว…"}</p></main>;
+  if (!report) return <main className="mx-auto max-w-4xl px-6 py-12"><p role={error ? "alert" : "status"} className="text-sm text-muted-foreground">{error || "กำลังโหลดเอกสาร…"}</p></main>;
   return <main className="expense-preview-screen monthly-report-screen">
-    <section className="no-print mx-auto max-w-4xl space-y-3 px-6 py-6">
-      <h1 className="text-2xl font-semibold">{report.title}</h1>
-      {report.preview && <p className="font-medium">สรุปช่วงทดสอบ ณ ตอนเรียกดู · ยังไม่ใช่รายงานปิดเดือน</p>}
-      <p>{report.requester.name} ({report.requester.employeeId})</p>
-      <p>{report.draft.workItems.length} วัน · รวม {formatMoney(calculateGrandTotal(report.draft.workItems))} บาท</p>
-      <p className="text-sm">ข้อมูลสรุป ณ วันออกเอกสาร · ลิงก์ส่วนตัวนี้หมดอายุพร้อมรอบล้างข้อมูล กรุณาเก็บ PDF ไว้ก่อนถึงกำหนด</p>
-      <Button onClick={async () => {
+    <ExpensePreviewToolbar printNotice={notice} onPrint={async (mode) => {
         setNotice("กำลังเตรียมรูปหลักฐาน…");
         try {
           await Promise.all(Array.from(document.querySelectorAll<HTMLImageElement>(".expense-document-stack img")).map((image) => image.decode()));
           await document.fonts.ready;
-          setNotice("เลือก Save as PDF ในหน้าต่างพิมพ์เพื่อบันทึกเอกสาร");
+          setNotice(mode === "download" ? "กำลังเปิดหน้าต่างพิมพ์ กรุณาเลือก Save as PDF เพื่อดาวน์โหลด" : "กำลังเปิดหน้าต่างพิมพ์ กรุณาเลือกเครื่องพิมพ์");
           window.print();
         } catch { setNotice("รูปหลักฐานยังไม่ครบ กรุณาลองเปิดรายงานอีกครั้ง"); }
-      }}>ดาวน์โหลด PDF / พิมพ์แบบฟอร์ม</Button>
-      {notice && <p role="status" className="text-sm">{notice}</p>}
-    </section>
+      }} />
     <div className="expense-page-stage"><DocumentPackagePreview draft={report.draft} requesterOverride={report.requester} /></div>
   </main>;
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Download, FilePlus2, Printer } from "lucide-react";
+import { ExpensePreviewToolbar } from "./expense-preview-toolbar";
 import { DocumentPackagePreview } from "@/components/documents/expense-request/document-package-preview";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,46 +10,6 @@ import {
   readExpenseRequestDraft
 } from "@/lib/storage/expense-request-session-storage";
 import type { ExpenseRequestForm } from "@/types/expense-request";
-
-function FloatingToolbar({
-  onBack,
-  onCreateNew,
-  onPrint,
-  printNotice
-}: {
-  onBack: () => void;
-  onCreateNew: () => void;
-  onPrint: (mode: "download" | "print") => void;
-  printNotice?: string;
-}) {
-  return (
-    <div className="expense-floating-toolbar-wrap no-print">
-      <div className="expense-floating-toolbar">
-        <Button onClick={onBack} size="sm" variant="outline">
-          <ArrowLeft aria-hidden="true" className="size-4" />
-          ย้อนกลับ
-        </Button>
-        <Button onClick={() => onPrint("download")} size="sm" variant="outline">
-          <Download aria-hidden="true" className="size-4" />
-          ดาวน์โหลด PDF
-        </Button>
-        <Button onClick={() => onPrint("print")} size="sm" variant="outline">
-          <Printer aria-hidden="true" className="size-4" />
-          พิมพ์เอกสาร
-        </Button>
-        <Button onClick={onCreateNew} size="sm" variant="secondary">
-          <FilePlus2 aria-hidden="true" className="size-4" />
-          สร้างใหม่
-        </Button>
-      </div>
-      {printNotice ? (
-        <p className="expense-print-notice" role="status">
-          {printNotice}
-        </p>
-      ) : null}
-    </div>
-  );
-}
 
 function CenteredDocumentContainer({ draft }: { draft: ExpenseRequestForm }) {
   return (
@@ -82,7 +42,7 @@ function PreviewLayout({ draft }: { draft: ExpenseRequestForm }) {
 
   return (
     <main className="expense-preview-screen">
-      <FloatingToolbar
+      <ExpensePreviewToolbar
         onBack={() => router.push("/documents/expense-request/new")}
         onCreateNew={handleCreateNew}
         onPrint={handlePrint}

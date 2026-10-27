@@ -667,7 +667,7 @@ export function ExpenseRequestEntryForm() {
           </div>
         </div>
 
-        <div className="mt-5 flex flex-wrap items-end gap-3">
+        <div className="mt-5 flex flex-wrap items-center gap-3">
           <p className="text-sm text-muted-foreground">รายการเดือน {month}</p>
           <Button disabled={!selectedRequester || !month || Boolean(cloudScope)} onClick={() => void loadCloud()} variant="outline">เปิดรายการที่บันทึกไว้</Button>
           {cloudScope && <Button variant="ghost" onClick={() => { try { sessionStorage.removeItem(CLOUD_SCOPE_KEY); } catch {} setCloudScope(null); setCloudMessage(""); setValue("workItems", [createDefaultExpenseWorkItem()]); }}>เปลี่ยนผู้ขอเบิก</Button>}

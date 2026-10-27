@@ -19,7 +19,9 @@ describe("test LINE summary table", () => {
     expect(store.employeeEntries).toHaveBeenCalledWith(employee.employeeId, "2026-10");
     expect(reply.table?.rows).toHaveLength(5);
     expect(reply.table?.total).toBe("1,950.00");
-    expect(reply.table?.note).toContain("2,050.00");
+    expect(reply.table?.title).toBe("ตารางสรุปตุลาคม");
+    expect(reply.table?.subtitle).toBe(employee.name);
+    expect(reply.table?.rows[0].date).toBe("01");
     expect(reply.buttons.map((button) => button.data)).toEqual(["summary:2026-10:5", "summary-link:2026-10", "intake:resume"]);
     const next = await summaryReply(store, employee, "2026-10", 5, false);
     expect(next.table?.rows[0].amount).toBe("450.00");

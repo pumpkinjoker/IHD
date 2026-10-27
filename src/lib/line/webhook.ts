@@ -51,13 +51,13 @@ export function toLineMessage(reply: IntakeReply) {
       contents: { type: "bubble", size: "mega", body: { type: "box", layout: "vertical", paddingAll: "16px", spacing: "8px", contents: [
         text(table.title, { size: "16px", weight: "bold" }), text(table.subtitle, { color: "#666666" }),
         { type: "separator" },
-        { type: "box", layout: "horizontal", spacing: "sm", contents: [column("วันที่", "48px", { weight: "bold" }), text("งาน / สถานที่", { flex: 1, weight: "bold" }), column("เบี้ยเลี้ยง", "76px", { align: "end", weight: "bold" })] },
+        { type: "box", layout: "horizontal", spacing: "sm", contents: [column("วันที่", "36px", { weight: "bold" }), text("รายการ / สถานที่", { flex: 1, weight: "bold" }), column("เบี้ยเลี้ยง", "76px", { align: "end", weight: "bold" })] },
         ...table.rows.map((row) => ({ type: "box", layout: "horizontal", spacing: "sm", contents: [
-          column(row.date, "48px", { wrap: false }),
+          column(row.date, "36px", { wrap: false }),
           { type: "box", layout: "vertical", flex: 1, spacing: "4px", contents: [text(row.subject), text(row.location, { color: "#777777" })] },
           column(row.amount, "76px", { align: "end", wrap: false })
         ] })),
-        { type: "separator" }, text(`เบี้ยเลี้ยงรวมทั้งเดือน ${table.total} บาท`, { weight: "bold" }), text(table.note, { color: "#666666" })
+        { type: "separator" }, text(`เบี้ยเลี้ยงทั้งหมด ${table.total} บาท`, { weight: "bold" })
       ] } },
       ...(reply.buttons.length ? { quickReply: { items: reply.buttons.map((button) => ({ type: "action", action: { type: "postback", label: button.label, data: button.data, displayText: button.label } })) } } : {})
     };

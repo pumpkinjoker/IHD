@@ -27,7 +27,7 @@ export type IntakeAction =
 export type IntakeButton = { label: string; data: string };
 export type IntakeReply = {
   text: string; buttons: IntakeButton[];
-  table?: { title: string; subtitle: string; rows: { date: string; subject: string; location: string; amount: string }[]; total: string; note: string };
+  table?: { title: string; subtitle: string; rows: { date: string; subject: string; location: string; amount: string }[]; total: string };
 };
 export type IntakeResult = {
   state: IntakeState;

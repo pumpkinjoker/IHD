@@ -1,4 +1,4 @@
-import { toLineMessage } from "./webhook";
+import { toLineMessages } from "./webhook";
 import type { IntakeReply } from "./intake";
 
 export class LineReplyRejected extends Error {
@@ -22,7 +22,7 @@ export class LineClient {
   async reply(replyToken: string, reply: IntakeReply) {
     const response = await this.request("https://api.line.me/v2/bot/message/reply", {
       method: "POST", headers: { Authorization: `Bearer ${this.accessToken}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ replyToken, messages: [toLineMessage(reply)] }),
+      body: JSON.stringify({ replyToken, messages: toLineMessages(reply) }),
       signal: AbortSignal.timeout(10_000)
     });
     // Never include provider response bodies: they may contain employee data.

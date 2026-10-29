@@ -382,8 +382,10 @@ store. The former `LINE_TEST_SUMMARY_ENABLED` flag remains supported when the ne
 flag is absent. Type **เมนู** or **ดูสรุปตาราง** in the OA to see the summary button.
 The Flex table shows the bound employee's confirmed entries in the current
 Bangkok month: day, subject/location, daily expenses and the complete month's
-expense total, including accommodation and other cost fields. Saved web amounts override the 300/day default. Five rows are
-shown per page; current drafts and the real monthly delivery remain unchanged.
+expense total, including accommodation and other cost fields. Saved web amounts override the 300/day default. Every confirmed row in the month is sent in one reply,
+with consecutive table messages only when LINE's bubble size limit requires it.
+No next-page tap is needed; the full-month total appears at the end.
+Current drafts and the real monthly delivery remain unchanged.
 An explicit month is accepted as `ดูสรุปตาราง YYYY-MM`. Buttons use the same
 per-conversation context checks as the existing intake menus. Enable the flag in
 production to offer the summary and document-link navigation. The sample Flex payload was validated with LINE's validation API,

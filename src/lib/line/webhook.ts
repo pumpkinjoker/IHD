@@ -61,7 +61,7 @@ export function toLineMessage(reply: IntakeReply) {
           { type: "box", layout: "vertical", flex: 1, spacing: "none", contents: [text(row.subject, { compact: true }), text(row.location, { color: "#777777", compact: true })] },
           column(row.amount, "96px", { align: "end", wrap: false, compact: true })
         ] })) },
-        { type: "separator" }, text(`เบิกค่าใช้จ่ายทั้งหมด ${table.total} บาท`, { size: "14px", weight: "bold", margin: "14px", align: "end" })
+        ...(table.showTotal === false ? [] : [{ type: "separator" }, text(`เบิกค่าใช้จ่ายทั้งหมด ${table.total} บาท`, { size: "14px", weight: "bold", margin: "14px", align: "end" })])
       ] } },
       ...(reply.buttons.length ? { quickReply: { items: reply.buttons.map((button) => ({ type: "action", action: { type: "postback", label: button.label, data: button.data, displayText: button.label } })) } } : {})
     };
@@ -97,4 +97,33 @@ export function toLineMessage(reply: IntakeReply) {
       })) }
     } : {})
   };
+}
+
+/** Send every row together, splitting only to respect LINE's 30 KB bubble limit. */
+export function toLineMessages(reply: IntakeReply): ReturnType<typeof toLineMessage>[] {
+  if (!reply.table) return [toLineMessage(reply)];
+  const table = reply.table;
+  const chunks: typeof table.rows[] = [];
+  let rows: typeof table.rows = [];
+  const message = (part: typeof table.rows, index: number, count: number) => toLineMessage({
+    ...reply,
+    buttons: index === count - 1 ? reply.buttons : [],
+    table: { ...table, rows: part, subtitle: count > 1 ? `${table.subtitle} · ส่วน ${index + 1}/${count}` : table.subtitle, showTotal: index === count - 1 }
+  });
+  for (const row of table.rows) {
+    // Leave room for part labels and the total on the final bubble.
+    const candidate = message([...rows, row], 0, 1);
+    if (rows.length && Buffer.byteLength(JSON.stringify(candidate), "utf8") > 28_000) {
+      chunks.push(rows);
+      rows = [];
+    }
+    rows.push(row);
+  }
+  if (rows.length) chunks.push(rows);
+  if (!chunks.length) return [toLineMessage(reply)];
+  const messages = chunks.map((part, index) => message(part, index, chunks.length));
+  if (messages.length > 5 || messages.some((item) => Buffer.byteLength(JSON.stringify(item), "utf8") > 30_000)) {
+    throw new Error("Summary exceeds LINE reply size limits");
+  }
+  return messages;
 }

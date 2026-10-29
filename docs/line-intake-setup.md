@@ -4,9 +4,12 @@
 
 This branch adds the conversation rules, local simulator, signed webhook, LINE
 reply/media client, Supabase persistence and Google My Drive archive adapter.
-The active test instance uses Supabase for records and local disk for photos.
-The OA webhook reaches this computer through the temporary relay/tunnel below.
-Google Drive and production hosting are not connected in this test setup.
+The live instance uses Supabase for records and private evidence storage.
+As of 2026-10-29 the OA webhook is
+`https://ihd-gen.vercel.app/api/line/webhook` on Vercel. Intake, summary navigation,
+Use webhook and redelivery are enabled; signed readiness checks and LINE Verify
+passed. No local computer or tunnel is needed. Local/tunnel instructions below
+describe the earlier development setup. Google Drive is not connected.
 Existing expense forms and document generation remain unchanged.
 
 Flow: postback `intake:start` → one image → subject → location → review → confirm.
@@ -262,9 +265,10 @@ Drive folder creation uses a global lease and upload retries search by a hashed
 message key. No public file permissions are created. Backdated confirmation moves
 evidence to the chosen work month before the entry is saved.
 
-The current Vercel connector cannot find the linked project in its stored team,
-so deployment still requires the correct account access. Live credentials and an
-end-to-end account test remain necessary. Add operational retry/recovery and
+Production deployment and server credentials were verified on 2026-10-29.
+The signed webhook and LINE verification checks do not send employee messages;
+an account-level conversation can be tested by typing `เมนู` in the OA.
+Add operational retry/recovery and
 connect the saved entries to the existing expense document workflow before staff
 rollout. Google Sheets sync, monthly PDF jobs and email delivery are not built in
 this step.

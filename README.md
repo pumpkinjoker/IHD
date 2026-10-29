@@ -78,7 +78,11 @@ The signed webhook at `/api/line/webhook` now has a configurable Supabase-backed
 receiver, persistent employee association, LINE replies and a private Google Drive
 archive. It is disabled by default until credentials and the SQL migration are
 configured. This test instance now uses Supabase project IHD for its database and
-stores photos in the private `ihd-evidence-test` Supabase bucket; the OA reaches this computer through a temporary tunnel. Google Sheets directory sync and email delivery are not implemented yet. Monthly
+stores photos in the private `ihd-evidence-test` Supabase bucket. As of 2026-10-29,
+the OA uses the permanent Vercel webhook at
+`https://ihd-gen.vercel.app/api/line/webhook`; no local computer or tunnel is needed.
+Production has intake and summary navigation enabled. LINE Verify and signed
+receiver readiness checks passed. Google Sheets directory sync and email delivery are not implemented yet. Monthly
 LINE summaries are scheduled for the first day at 08:00 Bangkok; see below.
 See [LINE setup and remaining integration work](docs/line-intake-setup.md).
 

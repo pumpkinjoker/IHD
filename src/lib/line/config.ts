@@ -44,7 +44,7 @@ export function configuredLineReceiver(env: NodeJS.ProcessEnv = process.env) {
     refreshToken: env.GOOGLE_REFRESH_TOKEN!, rootFolderId: env.GOOGLE_DRIVE_ROOT_FOLDER_ID! });
   const store = configuredLineStore(env);
   return createLineReceiver({
-    ...(env.LINE_TEST_SUMMARY_ENABLED === "true" && store instanceof SupabaseLineStore ? {
+    ...((env.LINE_SUMMARY_ENABLED ?? env.LINE_TEST_SUMMARY_ENABLED) === "true" && store instanceof SupabaseLineStore ? {
       summary: (employee, month, offset, hasDraft) => summaryReply(store, employee, month, offset, hasDraft),
       summaryLink: (employee, month, hasDraft) => summaryLinkReply(store, env, employee, month, hasDraft)
     } : {}),

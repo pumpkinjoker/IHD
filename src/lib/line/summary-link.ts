@@ -48,6 +48,6 @@ export async function summaryLinkReply(store: Store, env: Record<string, string 
     const token = randomBytes(16).toString("base64url");
     await api("rest/v1/line_report_links", "POST", { token_hash: createHash("sha256").update(token).digest("hex"), employee_id: details.employee_id, period: `${month}-01`, object_path: objectPath, expires_at: new Date(expiresAt).toISOString() });
     const link = `https://ihd-gen.vercel.app/s#${token}`;
-    return { text: `ลิงก์สรุปทดสอบเดือน ${month}\n${details.name}\n${link}\n\nเปิดดูตารางและบันทึกเป็น PDF ได้ ลิงก์ใช้ได้ไม่เกิน 24 ชั่วโมงครับ`, buttons };
+    return { text: `ลิงก์สรุปเดือน ${month}\n${details.name}\n${link}\n\nเปิดดูตารางและบันทึกเป็น PDF ได้ ลิงก์ใช้ได้ไม่เกิน 24 ชั่วโมงครับ`, buttons };
   } catch { return { text: "สร้างลิงก์สรุปไม่สำเร็จ กรุณาลองใหม่อีกครั้งครับ", buttons }; }
 }

@@ -7,7 +7,7 @@ export default defineConfig({
   use: {
     baseURL: "http://127.0.0.1:3000",
     launchOptions: {
-      args: ["--single-process", "--disable-features=MojoIpcz"]
+      args: process.platform === "linux" ? ["--single-process", "--disable-features=MojoIpcz"] : []
     },
     trace: "on-first-retry"
   },

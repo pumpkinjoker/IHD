@@ -1,6 +1,10 @@
 import { expect, test } from "@playwright/test";
 import path from "node:path";
 import masterData from "../../src/data/master-data.json";
+import { bangkokDate } from "../../src/lib/line/intake";
+
+const currentMonth = bangkokDate(new Date()).slice(0, 7);
+const workDate = `${currentMonth}-01`;
 
 test("creates and previews an expense request draft", async ({ page }) => {
   const team = masterData.teams[1];
@@ -64,8 +68,8 @@ test("creates and previews an expense request draft", async ({ page }) => {
     page.getByRole("definition").filter({ hasText: team.name })
   ).toBeVisible();
 
-  await page.getByLabel("วันที่เอกสาร").fill("2026-07-16");
-  await page.getByLabel("วันที่ปฏิบัติงาน").fill("2026-07-16");
+  await page.getByLabel("วันที่เอกสาร").fill(workDate);
+  await page.getByLabel("วันที่ปฏิบัติงาน").fill(workDate);
   await page.getByLabel("หัวข้องาน").fill("ถ่ายวิดีโอ");
   await page.getByLabel("เวลาเริ่มต้น").fill("08:00");
   await page.getByLabel("เวลาสิ้นสุด").fill("17:00");
@@ -150,7 +154,9 @@ test("creates and previews an expense request draft", async ({ page }) => {
     page.getByText(`ผู้ปฏิบัติงาน: ${requester.name}`)
   ).toBeVisible();
   await expect(page.getByText(`ผู้อนุมัติ: ${approver.name}`)).toBeVisible();
-  await expect(page.getByText("16 กรกฎาคม 2569")).toBeVisible();
+  await expect(page.getByText(new Intl.DateTimeFormat("th-TH", {
+    day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Bangkok"
+  }).format(new Date(`${workDate}T00:00:00+07:00`)))).toBeVisible();
   await expect(page.locator(".expense-purpose-cell")).toHaveCSS(
     "text-align",
     "left"
@@ -197,7 +203,7 @@ test("creates and previews an expense request draft", async ({ page }) => {
   await expect(page).toHaveURL(/\/documents\/expense-request\/new$/);
   await expect(page.getByLabel("ทีม")).toHaveText(team.name);
   await expect(page.getByLabel("ผู้ขอเบิก")).toHaveText(requester.name);
-  await expect(page.getByLabel("วันที่เอกสาร")).toHaveValue("2026-07-16");
+  await expect(page.getByLabel("วันที่เอกสาร")).toHaveValue(workDate);
   await expect(page.getByLabel("หัวข้องาน")).toHaveValue("ถ่ายวิดีโอ");
   await expect(page.getByLabel("ค่าเบี้ยเลี้ยง")).toHaveValue("1500");
   await expect(page.getByText(/ไฟล์: pasted-logo\.png/)).toBeVisible();
@@ -218,7 +224,7 @@ test("creates a preview with eleven expense items", async ({ page }) => {
   await page
     .getByRole("option", { name: new RegExp(requester.name) })
     .click();
-  await page.getByLabel("วันที่เอกสาร").fill("2026-09-03");
+  await page.getByLabel("วันที่เอกสาร").fill(`${currentMonth}-03`);
   const largeEvidenceBase64 = await page.evaluate(() => {
     const canvas = document.createElement("canvas");
     canvas.width = 900;
@@ -257,7 +263,7 @@ test("creates a preview with eleven expense items", async ({ page }) => {
     await page
       .getByLabel("วันที่ปฏิบัติงาน")
       .nth(index)
-      .fill(`2026-09-${String(index + 1).padStart(2, "0")}`);
+      .fill(`${currentMonth}-${String(index + 1).padStart(2, "0")}`);
     await page.getByLabel("หัวข้องาน").nth(index).fill(`รายการที่ ${index + 1}`);
     await page
       .locator('input[type="file"]')

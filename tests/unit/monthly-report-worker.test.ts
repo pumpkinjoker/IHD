@@ -60,3 +60,11 @@ describe("monthly personal report", () => {
     expect(transport).toHaveBeenCalledOnce();
   });
 });
+
+it("includes accommodation-only days in monthly totals without per diem or evidence", () => {
+  const lodgingJob = { ...job, snapshot: { ...job.snapshot, entries: [{ ...job.snapshot.entries[0], data: { ...job.snapshot.entries[0].data, kind: "accommodation" as const, imageId: "", expense: { accommodation: 1200, perDiem: 0 } } }] } };
+  const report = buildMonthlyReport(lodgingJob, [null]);
+  expect(monthlyReportSchema.safeParse(report).success).toBe(true);
+  expect(report.draft.workItems[0]).toMatchObject({ accommodation: 1200, perDiem: 0, evidenceImage: null, accommodationOnly: true });
+  expect(monthlyReportMessage(report, "https://ihd-gen.vercel.app/s#sample")).toContain("1,200 บาท");
+});

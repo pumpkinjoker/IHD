@@ -19,7 +19,7 @@ const databaseFetch: typeof fetch = async (input, init) => {
   const url = new URL(String(input));
   const body = init?.body ? JSON.parse(String(init.body)) : {};
   if (url.pathname.endsWith("/line_work_entries") && init?.method === "GET") {
-    if (url.searchParams.has("work_date")) return Response.json((await db.query("select id from public.line_work_entries where employee_id=$1 and work_date=$2::date limit 1", [url.searchParams.get("employee_id")!.slice(3),url.searchParams.get("work_date")!.slice(3)])).rows);
+    if (url.searchParams.has("work_date")) return Response.json((await db.query("select data from public.line_work_entries where employee_id=$1 and work_date=$2::date limit 1", [url.searchParams.get("employee_id")!.slice(3),url.searchParams.get("work_date")!.slice(3)])).rows);
     const month = url.searchParams.get("and")!.match(/work_date.gte.(\d{4}-\d{2})/)![1];
     const result = await db.query(`select data from public.line_work_entries where user_id=$1 and employee_id=$2 and to_char(work_date,'YYYY-MM')=$3
       order by work_date desc,created_at desc,id desc limit $4 offset $5`, [url.searchParams.get("user_id")!.slice(3), url.searchParams.get("employee_id")!.slice(3), month, Number(url.searchParams.get("limit")), Number(url.searchParams.get("offset"))]);
@@ -75,6 +75,7 @@ beforeAll(async () => {
   await db.exec(readFileSync("supabase/migrations/202610260001_line_intake.sql", "utf8"));
   await db.exec("create table public.line_evidence_files(reference text primary key,employee_id text,work_date date,purged_at timestamptz);");
   await db.exec(readFileSync("supabase/migrations/20261027032608_line_supabase_evidence_reference.sql", "utf8"));
+  await db.exec(readFileSync("supabase/migrations/20261101065246_line_accommodation_intake.sql", "utf8"));
 }, 30_000);
 beforeEach(async () => {
   sequence = 0;
@@ -90,8 +91,8 @@ describe("real LINE processing with durable SQL transactions", () => {
     await h.receiver.receive([postback(confirm)]);
     await h.receiver.receive([message("text", "เมนู")]);
     const buttons = h.line.reply.mock.calls.at(-1)![1].buttons;
-    expect(buttons.map((button) => button.label)).toEqual(["เพิ่มข้อมูล", "ตารางสรุป", "ลิงก์เอกสารเบิก"]);
-    expect(buttons.map((button) => button.data.split("|")[0])).toEqual(["intake:start", "summary:2026-10:0", "summary-link:2026-10"]);
+    expect(buttons.map((button) => button.label)).toEqual(["เพิ่มข้อมูล", "เบิกค่าที่พัก", "ตารางสรุป", "ลิงก์เอกสารเบิก"]);
+    expect(buttons.map((button) => button.data.split("|")[0])).toEqual(["intake:start", "intake:accommodation", "summary:2026-10:0", "summary-link:2026-10"]);
   });
   it("requests an owned summary link without clearing the draft", async () => {
     const link = vi.fn<NonNullable<ReceiverDependencies["summaryLink"]>>().mockResolvedValue({ text: "ลิงก์ส่วนตัว", buttons: [{ label: "กลับรายการที่ค้าง", data: "intake:resume" }] });
@@ -136,7 +137,7 @@ describe("real LINE processing with durable SQL transactions", () => {
     await h.receiver.receive([message("image"), message("text", "งานซ้ำ"), message("text", "บางนา")]);
     const confirm = h.line.reply.mock.calls.at(-1)![1].buttons.find((button) => button.data.startsWith("intake:confirm|"))!;
     await h.receiver.receive([postback(confirm.data)]);
-    expect(h.line.reply.mock.calls.at(-1)![1].text).toContain("หนึ่งงานต่อวัน");
+    expect(h.line.reply.mock.calls.at(-1)![1].text).toContain("มีรายการหน้างานแล้ว");
     expect((await db.query("select * from public.line_work_entries")).rows).toHaveLength(1);
   });
   it("shows only confirmed records for the current user and preserves a draft while browsing", async () => {
@@ -268,5 +269,60 @@ describe("real LINE processing with durable SQL transactions", () => {
       await expect(db.query("select * from public.line_sessions")).rejects.toThrow();
       await expect(db.query("select public.line_claim_media('attacker')")).rejects.toThrow();
     } finally { await db.exec("reset role"); }
+  });
+});
+
+describe("accommodation intake", () => {
+  const latest = (h: ReturnType<typeof harness>, prefix: string) => h.line.reply.mock.calls.at(-1)![1].buttons.find(button => button.data.startsWith(prefix))!.data;
+  async function lodging(h: ReturnType<typeof harness>, day = "25") {
+    await h.receiver.receive([postback("intake:accommodation"), message("text", day), message("text", "1,200.50")]);
+    const confirm = latest(h, "intake:confirm|");
+    await h.receiver.receive([postback(confirm)]);
+  }
+  async function work(h: ReturnType<typeof harness>) {
+    await h.receiver.receive([postback("intake:start"), message("image"), message("text", "ถ่ายทำ"), message("text", "บางนา")]);
+    await h.receiver.receive([postback(latest(h, "intake:edit-menu|"))]);
+    await h.receiver.receive([postback(latest(h, "intake:edit:date|")), message("text", "25")]);
+    await h.receiver.receive([postback(latest(h, "intake:confirm|"))]);
+  }
+  async function idle(h: ReturnType<typeof harness>) {
+    await register(h);
+    await h.receiver.receive([postback(latest(h, "intake:cancel|"))]);
+  }
+  it("saves without media and merges work then lodging without changing existing amounts", async () => {
+    const h = harness(); await idle(h); await work(h);
+    await db.exec(`update public.line_work_entries set data=jsonb_set(data,'{expense}','{"perDiem":450,"fare":100}'::jsonb)`);
+    await lodging(h);
+    const rows = (await db.query<{ data: Record<string, unknown> }>("select data from public.line_work_entries")).rows;
+    expect(rows).toHaveLength(1);
+    expect(rows[0].data).toMatchObject({ workDate: "2026-10-25", imageId: "drive:file-1", expense: { perDiem: 450, fare: 100, accommodation: 1200.50 } });
+    expect(h.line.image).toHaveBeenCalledTimes(1);
+    expect(h.drive.placeEvidence).toHaveBeenCalledTimes(1);
+    await lodging(h);
+    expect(h.line.reply.mock.calls.at(-1)![1].text).toContain("มีรายการค่าที่พักแล้ว");
+    expect((await db.query("select id from public.line_work_entries")).rows).toHaveLength(1);
+  });
+  it("starts with lodging only and later merges work with one per diem", async () => {
+    const h = harness(); await idle(h); await lodging(h);
+    const first = (await db.query<{ data: Record<string, unknown> }>("select data from public.line_work_entries")).rows[0].data;
+    expect(first).toMatchObject({ kind: "accommodation", imageId: "", expense: { perDiem: 0, accommodation: 1200.50 } });
+    expect(h.line.image).not.toHaveBeenCalled(); expect(h.drive.placeEvidence).not.toHaveBeenCalled();
+    await work(h);
+    const rows = (await db.query<{ data: Record<string, unknown> }>("select data from public.line_work_entries")).rows;
+    expect(rows).toHaveLength(1);
+    expect(rows[0].data).toMatchObject({ imageId: "drive:file-1", subject: "ถ่ายทำ", expense: { accommodation: 1200.50, perDiem: 300 } });
+    expect(rows[0].data.kind).toBeUndefined();
+  });
+  it("offers the menu without the summary feature and resumes onboarding into lodging", async () => {
+    const h = harness();
+    await h.receiver.receive([postback("intake:accommodation"), message("text", employee.employeeId)]);
+    await h.receiver.receive([postback(latest(h, "employee:confirm|"))]);
+    expect(h.line.reply.mock.calls.at(-1)![1].text).toContain("กรอกวันที่เบิกค่าที่พัก");
+    await h.receiver.receive([postback(latest(h, "intake:cancel|")), message("text", "เมนู")]);
+    expect(latest(h, "intake:accommodation|")).toBeTruthy();
+    await h.receiver.receive([message("text", "เบิกค่าที่พัก"), message("text", "2026-09-30"), message("text", "0")]);
+    expect(h.line.reply.mock.calls.at(-1)![1].text).toContain("มากกว่า 0");
+    await h.receiver.receive([message("text", "1200"), postback(latest(h, "intake:cancel|"))]);
+    expect((await db.query("select id from public.line_work_entries")).rows).toHaveLength(0);
   });
 });

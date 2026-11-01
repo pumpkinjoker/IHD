@@ -13,7 +13,7 @@ const row = { id: "event-1", data: entry };
 const rollback = vi.fn(async () => undefined);
 const commit = vi.fn(async () => undefined);
 let failUpdate = false;
-let rows = [row];
+let rows: { id: string; data: typeof entry & { kind?: "accommodation"; expense?: { accommodation: number; perDiem: number } } }[] = [row];
 let updateBody: Record<string, unknown> | undefined;
 const request = (body?: unknown) => new Request("http://127.0.0.1:3000/api/expense-records?employeeId=12345678&month=2026-10", body ? { method: "POST", headers: { origin: "http://127.0.0.1:3000" }, body: JSON.stringify(body) } : undefined);
 const item = () => ({ ...createDefaultExpenseWorkItem(), id: row.id, workDate: entry.workDate, subject: "แก้ไขจากเว็บ", location: entry.location, evidenceImage: { fileName: "old.png", mimeType: "image/png", dataUrl: `data:image/png;base64,${png.toString("base64")}` } });
@@ -118,4 +118,17 @@ describe("original expense form data API", () => {
     expect((await response.json()).error).toContain("ฐานข้อมูล");
     expect((await POST(request({}))).status).toBe(503);
   });
+});
+
+it("opens and edits accommodation-only records without touching evidence storage", async () => {
+  rows = [{ ...row, data: { ...entry, kind: "accommodation", imageId: "", expense: { accommodation: 1200, perDiem: 0 } } }];
+  const opened = await GET(request());
+  expect(opened.status).toBe(200);
+  const loaded = (await opened.json()).items[0];
+  expect(loaded).toMatchObject({ accommodation: 1200, perDiem: 0, accommodationOnly: true, evidenceImage: null });
+  expect(LocalEvidenceArchive.prototype.readEvidence).not.toHaveBeenCalled();
+  const saved = await POST(request({ employeeId: entry.employeeId, month: "2026-10", item: { ...loaded, accommodation: 1500 } }));
+  expect(saved.status).toBe(200);
+  expect(updateBody).toMatchObject({ data: { expense: { accommodation: 1500, perDiem: 0 } } });
+  expect(LocalEvidenceArchive.prototype.editEvidence).not.toHaveBeenCalled();
 });

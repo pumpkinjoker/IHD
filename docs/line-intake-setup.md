@@ -414,3 +414,26 @@ edited without enabling arbitrary month selection. The token travels in a URL
 fragment, then a request header/body. Cost edits save to the existing work rows.
 The monthly message reports the complete expense total and omits the link-expiry
 sentence; expiry and retention rules still apply.
+
+### Accommodation claims
+
+The idle LINE menu includes **เบิกค่าที่พัก** (`intake:accommodation`). The same
+text command starts the flow while idle. Enter a day in the draft month or a
+past ISO date (`YYYY-MM-DD`), then a positive baht amount (up to two decimal
+places), review and confirm. No photo is requested. Date/amount edits and
+cancellation use the normal scoped buttons; unfinished work is preserved.
+
+Apply migration `20261101065246_line_accommodation_intake.sql` before releasing
+the updated webhook. Deploy the updated `monthly-report-worker` as well so
+scheduled summaries support entries without images. Local mode applies the
+migration automatically. No new environment variables are needed.
+
+There is still one expense row per employee/day. Confirmation atomically adds
+accommodation to that day's existing expense fields, preserving work details,
+reviewed costs and evidence. Accommodation can also be submitted first: that
+row starts with zero per diem and no evidence, and later work intake adds its
+usual per diem and photo without losing the accommodation. Repeated claims of
+the same kind are rejected; edit the existing amount through the document form.
+A different LINE account cannot merge into another account's saved row.
+Accommodation-only entries appear in the accommodation column and monthly total,
+open/edit without images, and are omitted from the per-diem evidence pages.

@@ -7,6 +7,7 @@ export type IntakeEmployee = { employeeId: string; name: string; active: boolean
 export type EmployeeLookup = (employeeId: string) => IntakeEmployee | null | Promise<IntakeEmployee | null>;
 export type EmployeeIntakeAction = IntakeAction | { type: "confirmEmployee" } | { type: "changeEmployee" };
 export type EmployeeIntakeState = {
+  pendingAccommodation?: boolean;
   employee: IntakeEmployee | null;
   candidate: IntakeEmployee | null;
   onboarding: "idle" | "employeeId" | "confirmation";
@@ -32,7 +33,7 @@ export async function transitionEmployeeIntake(
   const reply = (text: string, buttons = [cancel], state = current): EmployeeIntakeResult => ({ state, reply: { text, buttons } });
   const askEmployee = (): EmployeeIntakeResult => reply(
     "ใช้งานครั้งแรก กรุณาพิมพ์รหัสพนักงาน 8 หลักครับ",
-    [cancel], { ...INITIAL_EMPLOYEE_INTAKE_STATE, onboarding: "employeeId" }
+    [cancel], { ...INITIAL_EMPLOYEE_INTAKE_STATE, onboarding: "employeeId", pendingAccommodation: action.type === "startAccommodation" || current.pendingAccommodation }
   );
 
   if (action.type === "cancel" && current.onboarding !== "idle") {
@@ -43,7 +44,7 @@ export async function transitionEmployeeIntake(
     return askEmployee();
   }
   if (!current.employee) {
-    if (action.type === "start") {
+    if (action.type === "start" || action.type === "startAccommodation") {
       if (current.onboarding !== "idle") return reply("กรุณากรอกรหัสพนักงานและเลือกชื่อให้เรียบร้อยก่อนครับ");
       return askEmployee();
     }
@@ -64,7 +65,7 @@ export async function transitionEmployeeIntake(
       // Read the directory again so a deactivated or removed employee cannot bind.
       const employee = await findEmployee(current.candidate.employeeId);
       if (!employee?.active || employee.employeeId !== current.candidate.employeeId) return askEmployee();
-      const result = transitionIntake(INITIAL_INTAKE_STATE, { type: "start" }, now);
+      const result = transitionIntake(INITIAL_INTAKE_STATE, { type: current.pendingAccommodation ? "startAccommodation" : "start" }, now);
       return {
         state: { employee, candidate: null, onboarding: "idle", intake: result.state },
         reply: { ...result.reply, text: `บันทึกในชื่อ ${employee.name} (${employee.employeeId})\n${result.reply.text}` }
@@ -76,7 +77,7 @@ export async function transitionEmployeeIntake(
   if (action.type === "confirmEmployee") return reply("เลือกรหัสพนักงานไว้แล้วครับ", [start, change]);
   const imageStartsEntry = action.type === "image" && current.intake.step === "idle";
   // Check active membership at the start and before committing; no OTP is used.
-  if (action.type === "start" || action.type === "confirm" || imageStartsEntry) {
+  if (action.type === "start" || action.type === "startAccommodation" || action.type === "confirm" || imageStartsEntry) {
     const employee = await findEmployee(current.employee.employeeId);
     if (!employee?.active || employee.employeeId !== current.employee.employeeId) return askEmployee();
   }
@@ -84,7 +85,7 @@ export async function transitionEmployeeIntake(
     ? transitionIntake(INITIAL_INTAKE_STATE, { type: "start" }, now).state
     : current.intake;
   const result = transitionIntake(intake, action, now);
-  const replyText = action.type === "start" || imageStartsEntry
+  const replyText = action.type === "start" || action.type === "startAccommodation" || imageStartsEntry
     ? `บันทึกในชื่อ ${current.employee.name} (${current.employee.employeeId})\n${result.reply.text}`
     : result.reply.text;
   return {

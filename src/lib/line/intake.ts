@@ -1,7 +1,9 @@
 /** Shared conversation rules for the simulator and the future LINE adapter. */
-export type IntakeStep = "idle" | "photo" | "subject" | "location" | "review" | "date";
+export type IntakeStep = "idle" | "photo" | "subject" | "location" | "review" | "date" | "amount";
 
 export type IntakeDraft = {
+  kind?: "accommodation";
+  accommodation?: number;
   workDate: string;
   imageId: string | null;
   subject: string;
@@ -15,11 +17,12 @@ export type IntakeState = {
 
 export type IntakeAction =
   | { type: "start" }
+  | { type: "startAccommodation" }
   | { type: "cancel" }
   | { type: "confirm" }
   | { type: "editMenu" }
   | { type: "resume" }
-  | { type: "edit"; field: "photo" | "subject" | "location" | "date" }
+  | { type: "edit"; field: "photo" | "subject" | "location" | "date" | "amount" }
   | { type: "image"; imageId: string }
   | { type: "text"; text: string }
   | { type: "unsupported" };
@@ -53,7 +56,7 @@ function validWorkDate(value: string, today: string) {
 
 function review(draft: IntakeDraft): IntakeReply {
   return {
-    text: `ตรวจสอบรายการก่อนบันทึก\nวันที่: ${draft.workDate}\nรูป: 1 รูป\nหัวข้องาน: ${draft.subject}\nสถานที่: ${draft.location}`,
+    text: draft.kind === "accommodation" ? `ตรวจสอบเบิกค่าที่พัก\nวันที่: ${draft.workDate}\nค่าที่พัก: ${draft.accommodation?.toLocaleString("th-TH")} บาท\nไม่ต้องแนบรูปภาพ` : `ตรวจสอบรายการก่อนบันทึก\nวันที่: ${draft.workDate}\nรูป: 1 รูป\nหัวข้องาน: ${draft.subject}\nสถานที่: ${draft.location}`,
     buttons: [
       { label: "ใช้แล้วข้อมูลถูกต้องเวรี่กู้ด", data: "intake:confirm" },
       { label: "แก้ไข", data: "intake:edit-menu" },
@@ -73,6 +76,11 @@ export function transitionIntake(
   if (action.type === "cancel") {
     return { state: INITIAL_INTAKE_STATE, reply: { text: "ยกเลิกรายการแล้ว", buttons: [{ label: "เพิ่มข้อมูล", data: "intake:start" }] } };
   }
+  if (action.type === "startAccommodation") {
+    if (current.step !== "idle") return unchanged("มีรายการที่กำลังทำอยู่ กรุณาบันทึกหรือยกเลิกก่อนเบิกค่าที่พักครับ");
+    return { state: { step: "date", draft: { kind: "accommodation", workDate: bangkokDate(now), imageId: null, subject: "เบิกค่าที่พัก", location: "" } },
+      reply: { text: "กรอกวันที่เบิกค่าที่พัก เช่น 25 หรือ YYYY-MM-DD ครับ วันที่ซ้ำกับเบี้ยเลี้ยงได้ ไม่ต้องแนบรูปภาพ", buttons: [cancelButton] } };
+  }
   if (action.type === "start") {
     if (current.step !== "idle") return unchanged("มีรายการที่กำลังทำอยู่ กรุณาทำต่อ หรือกดยกเลิกก่อนเริ่มรายการใหม่");
     return {
@@ -88,31 +96,35 @@ export function transitionIntake(
   if (action.type === "editMenu" && current.step === "review") return {
     state: current,
     reply: { text: "ต้องการแก้ไขส่วนไหนครับ?", buttons: [
+      ...(draft.kind === "accommodation" ? [{ label: "แก้ค่าที่พัก", data: "intake:edit:amount" }] : [
       { label: "เปลี่ยนรูป", data: "intake:edit:photo" },
       { label: "แก้หัวข้องาน", data: "intake:edit:subject" },
-      { label: "แก้สถานที่", data: "intake:edit:location" },
+      { label: "แก้สถานที่", data: "intake:edit:location" }]),
       { label: "เปลี่ยนวันที่", data: "intake:edit:date" },
       { label: "กลับสรุป", data: "intake:resume" }
     ] }
   };
   if (action.type === "edit") {
     if (current.step !== "review") return unchanged("กรุณาทำขั้นตอนปัจจุบันให้เสร็จก่อนแก้ไขครับ");
+    if (draft.kind === "accommodation" && !["date", "amount"].includes(action.field)) return unchanged("รายการค่าที่พักแก้ไขวันที่และจำนวนเงินได้ครับ");
+    if (draft.kind !== "accommodation" && action.field === "amount") return unchanged("กรุณาแก้ยอดเบี้ยเลี้ยงในเอกสารครับ");
     const prompts = {
+      amount: "กรอกค่าที่พักเป็นจำนวนบาท เช่น 1200 หรือ 1,200.50 ครับ",
       photo: "ส่งรูปใหม่ 1 รูปเพื่อแทนรูปเดิมครับ",
       subject: "พิมพ์หัวข้องานใหม่ครับ",
       location: "พิมพ์สถานที่ใหม่ครับ",
-      date: `พิมพ์แค่เลขวันที่ เช่น 25 ครับ ใช้เดือนและปีเดิม (${draft.workDate.slice(0, 7)})`
+      date: draft.kind === "accommodation" ? "กรอกวันที่เบิกค่าที่พัก เช่น 25 หรือ YYYY-MM-DD ครับ" : `พิมพ์แค่เลขวันที่ เช่น 25 ครับ ใช้เดือนและปีเดิม (${draft.workDate.slice(0, 7)})`
     };
     return { state: { step: action.field, draft }, reply: { text: prompts[action.field], buttons: [cancelButton] } };
   }
   if (action.type === "confirm") {
-    if (current.step !== "review" || !draft.imageId || !draft.subject || !draft.location) {
+    if (current.step !== "review" || (draft.kind === "accommodation" ? !draft.accommodation : !draft.imageId || !draft.subject || !draft.location)) {
       return unchanged("กรุณาส่งรูป หัวข้องาน และสถานที่ให้ครบก่อนยืนยันครับ");
     }
     return {
       state: INITIAL_INTAKE_STATE,
-      entry: { ...draft, imageId: draft.imageId },
-      reply: { text: "บันทึกรายการหน้างานแล้วครับ", buttons: [{ label: "เพิ่มข้อมูล", data: "intake:start" }] }
+      entry: { ...draft, imageId: draft.imageId ?? "" },
+      reply: { text: draft.kind === "accommodation" ? "บันทึกค่าที่พักแล้วครับ" : "บันทึกรายการหน้างานแล้วครับ", buttons: [{ label: "เพิ่มข้อมูล", data: "intake:start" }] }
     };
   }
   if (action.type === "image") {
@@ -129,9 +141,13 @@ export function transitionIntake(
   if (current.step === "date") {
     const month = draft.workDate.slice(0, 7);
     const day = /^\d{1,2}$/.test(value) ? value.padStart(2, "0") : value.startsWith(month + "-") && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value.slice(8) : "";
-    const date = `${month}-${day}`;
-    if (!day || !validWorkDate(date, bangkokDate(now))) return unchanged("วันที่ไม่ถูกต้องหรืออยู่ในอนาคตครับ พิมพ์แค่เลขวันภายในเดือนเดิม เช่น 25");
+    const date = draft.kind === "accommodation" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : `${month}-${day}`;
+    if (!validWorkDate(date, bangkokDate(now))) return unchanged(draft.kind === "accommodation" ? "วันที่ไม่ถูกต้องหรืออยู่ในอนาคตครับ กรอกเลขวัน หรือ YYYY-MM-DD" : "วันที่ไม่ถูกต้องหรืออยู่ในอนาคตครับ พิมพ์แค่เลขวันภายในเดือนเดิม เช่น 25");
     draft.workDate = date;
+    if (draft.kind === "accommodation" && !draft.accommodation) return { state: { step: "amount", draft }, reply: { text: "กรอกค่าที่พักเป็นจำนวนบาท เช่น 1200 หรือ 1,200.50 ครับ", buttons: [cancelButton] } };
+  } else if (current.step === "amount") {
+    if (!/^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?$/.test(value) || !Number.isFinite(Number(value.replaceAll(",", ""))) || Number(value.replaceAll(",", "")) <= 0) return unchanged("กรุณากรอกค่าที่พักมากกว่า 0 บาท และทศนิยมไม่เกิน 2 ตำแหน่งครับ");
+    draft.accommodation = Number(value.replaceAll(",", ""));
   } else {
     if (!value || value.length > 300) return unchanged("กรุณาพิมพ์ข้อมูล 1–300 ตัวอักษรครับ");
     if (current.step === "subject") {
@@ -147,6 +163,8 @@ export function transitionIntake(
 /** Commands use postback data so a job title like “ยกเลิก” remains ordinary text. */
 export function parseIntakePostback(data: string): IntakeAction {
   switch (data) {
+    case "intake:accommodation": return { type: "startAccommodation" };
+    case "intake:edit:amount": return { type: "edit", field: "amount" };
     case "intake:start": return { type: "start" };
     case "intake:cancel": return { type: "cancel" };
     case "intake:confirm": return { type: "confirm" };

@@ -378,7 +378,7 @@ function WorkItemEditor({
                 />
               ) : (
                 <span className="px-4 text-center text-sm text-muted-foreground">
-                  {item.evidenceExpired ? "รูปถูกลบเมื่อขึ้นเดือนที่ 3แล้ว" : "ยังไม่มีรูปหลักฐาน"}
+                  {item.accommodationOnly ? "เบิกค่าที่พัก ไม่ต้องแนบรูปภาพ" : item.evidenceExpired ? "รูปถูกลบเมื่อขึ้นเดือนที่ 3แล้ว" : "ยังไม่มีรูปหลักฐาน"}
                 </span>
               )}
             </div>
@@ -395,7 +395,7 @@ function WorkItemEditor({
                 type="file"
               />
               <div className="flex flex-wrap gap-2">
-                <Button disabled={item.evidenceExpired} onClick={() => document.getElementById(imageInputId)?.click()} variant="outline">
+                <Button disabled={item.evidenceExpired || item.accommodationOnly} onClick={() => document.getElementById(imageInputId)?.click()} variant="outline">
                   <ImagePlus aria-hidden="true" className="size-4" />
                   {item.evidenceImage ? "เปลี่ยนรูป" : "อัปโหลดรูป"}
                 </Button>

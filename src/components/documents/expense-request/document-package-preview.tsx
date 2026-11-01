@@ -12,7 +12,7 @@ type DocumentPackagePreviewProps = {
 
 export function DocumentPackagePreview({ draft, requesterOverride }: DocumentPackagePreviewProps) {
   const requester = requesterOverride ?? findRequesterByKey(draft.requesterKey);
-  const evidencePages = paginateEvidenceItems(draft.workItems);
+  const evidencePages = paginateEvidenceItems(draft.workItems.filter(item => !item.accommodationOnly));
   const evidencePageItemStartIndexes = evidencePages.map((_, index) =>
     evidencePages
       .slice(0, index)

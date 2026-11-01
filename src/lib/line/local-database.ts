@@ -1,3 +1,4 @@
+import { hasExpenseKind, type ExpenseEntry } from "./entry-kind";
 import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import type { PGlite } from "@electric-sql/pglite";
@@ -44,6 +45,13 @@ export async function openLocalDatabase(root = localDataRoot()): Promise<PGlite>
           await db.exec(migration);
           await db.query("insert into public.ihd_local_migrations(id) values($1)", [version]);
         }
+        const accommodationVersion = "20261101065246";
+        if (!(await db.query("select id from public.ihd_local_migrations where id=$1", [accommodationVersion])).rows.length) {
+          await db.transaction(async tx => {
+            await tx.exec(await readFile(path.join(process.cwd(), "supabase/migrations/20261101065246_line_accommodation_intake.sql"), "utf8"));
+            await tx.query("insert into public.ihd_local_migrations(id) values($1)", [accommodationVersion]);
+          });
+        }
         // Seed the local directory from the existing validated IHD source. Keep
         // removed staff inactive while historical work entries remain untouched.
         await db.exec(`create table if not exists public.ihd_employee_directory (
@@ -79,9 +87,10 @@ export async function closeLocalDatabase(root: string) {
 }
 
 export class LocalLineStore implements LineStore {
-  async hasEntryForDate(employeeId: string, date: string) {
+  async hasEntryForDate(employeeId: string, date: string, kind?: "work" | "accommodation") {
     const db = await openLocalDatabase(this.root);
-    return (await db.query("select 1 from public.line_work_entries where employee_id=$1 and work_date=$2::date limit 1", [employeeId, date])).rows.length > 0;
+    const rows = await db.query<{ data: ExpenseEntry }>("select data from public.line_work_entries where employee_id=$1 and work_date=$2::date limit 1", [employeeId, date]);
+    return rows.rows.some(row => !kind || hasExpenseKind(row.data, kind));
   }
   async listEmployees() {
     const db = await openLocalDatabase(this.root);

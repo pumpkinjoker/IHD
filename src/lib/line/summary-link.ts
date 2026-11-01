@@ -26,8 +26,8 @@ export async function summaryLinkReply(store: Store, env: Record<string, string 
       if (!response.ok) throw new Error("Preview request failed");
       return response;
     };
-    const paths = entries.map((row) => row.data.imageId);
-    const registry = await (await api(`rest/v1/line_evidence_files?${new URLSearchParams({ reference: `in.(${paths.join(",")})`, employee_id: `eq.${details.employee_id}`, purged_at: "is.null", select: "reference,object_path,mime_type" })}`)).json() as { reference: string; object_path: string; mime_type: string }[];
+    const paths = entries.map((row) => row.data.imageId).filter(Boolean);
+    const registry = paths.length ? await (await api(`rest/v1/line_evidence_files?${new URLSearchParams({ reference: `in.(${paths.join(",")})`, employee_id: `eq.${details.employee_id}`, purged_at: "is.null", select: "reference,object_path,mime_type" })}`)).json() as { reference: string; object_path: string; mime_type: string }[] : [];
     const encodePath = (path: string) => path.split("/").map(encodeURIComponent).join("/");
     const signed = async (bucket: string, path: string) => {
       const result = await (await api(`storage/v1/object/sign/${bucket}/${encodePath(path)}`, "POST", { expiresIn })).json();
@@ -35,6 +35,7 @@ export async function summaryLinkReply(store: Store, env: Record<string, string 
       return `${url}/storage/v1${result.signedURL}`;
     };
     const workItems = await Promise.all(entries.map(async (row) => {
+      if (row.data.kind === "accommodation" && !row.data.imageId) return reportWorkItem(row);
       const image = registry.find((record) => record.reference === row.data.imageId);
       if (!image) throw new Error("Source evidence missing");
       return { ...reportWorkItem(row), evidenceImage: { fileName: evidenceFileName(row.data.workDate, image.mime_type), mimeType: image.mime_type, dataUrl: await signed("ihd-evidence-test", image.object_path) } };

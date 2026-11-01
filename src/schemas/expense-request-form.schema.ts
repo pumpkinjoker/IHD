@@ -38,7 +38,8 @@ export const expenseWorkItemDraftSchema = z
     entertainment: optionalAmountSchema,
     otherExpense: optionalAmountSchema,
     evidenceImage: evidenceImageSchema.nullable(),
-    evidenceExpired: z.boolean().optional()
+    evidenceExpired: z.boolean().optional(),
+    accommodationOnly: z.boolean().optional()
   })
   .strip();
 
@@ -77,7 +78,7 @@ export const expenseWorkItemSchema = expenseWorkItemDraftSchema.superRefine(
       });
     }
 
-    if (!item.evidenceImage && !item.evidenceExpired) {
+    if (!item.evidenceImage && !item.evidenceExpired && !item.accommodationOnly) {
       ctx.addIssue({
         code: "custom",
         path: ["evidenceImage"],

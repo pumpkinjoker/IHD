@@ -35,6 +35,6 @@ export function reportRequester(employee: { employee_id: string; name: string; e
   const [firstName, ...rest] = employee.name.trim().split(/\s+/);
   return { employeeId: employee.employee_id, name: employee.name, firstName, lastName: rest.join(" "), email: employee.email, position: employee.position, department: employee.team };
 }
-export function reportWorkItem(row: { id: string; data: { workDate: string; subject: string; location: string; expense?: Partial<ExpenseWorkItem> } }): ExpenseWorkItem {
-  return { ...createDefaultExpenseWorkItem(), ...row.data.expense, id: row.id, workDate: row.data.workDate, subject: row.data.subject, location: row.data.location, evidenceImage: null, evidenceExpired: false };
+export function reportWorkItem(row: { id: string; data: { workDate: string; subject: string; location: string; kind?: "accommodation"; expense?: Partial<ExpenseWorkItem> } }): ExpenseWorkItem {
+  return { ...createDefaultExpenseWorkItem(), ...row.data.expense, id: row.id, workDate: row.data.workDate, subject: row.data.subject, location: row.data.location, evidenceImage: null, evidenceExpired: false, accommodationOnly: row.data.kind === "accommodation" };
 }

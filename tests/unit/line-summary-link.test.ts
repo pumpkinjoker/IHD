@@ -93,3 +93,18 @@ it.skipIf(process.env.IHD_LINK_SMOKE !== "1")("opens an actual signed preview an
     await api(`rest/v1/line_evidence_files?${new URLSearchParams({ reference: `eq.${ref}` })}`, "DELETE");
   }
 }, 60_000);
+
+it("creates a document link for lodging only without looking up or signing an image", async () => {
+  const store = { employeeDetails: vi.fn().mockResolvedValue(details), employeeEntries: vi.fn().mockResolvedValue([{ ...row, data: { ...row.data, kind: "accommodation", imageId: "", expense: { accommodation: 1200, perDiem: 0 } } }]) };
+  let snapshot: unknown;
+  const transport: typeof fetch = async (input, init) => {
+    const path = new URL(String(input)).pathname;
+    expect(path).not.toContain("line_evidence_files");
+    expect(path).not.toContain("/object/sign/");
+    if (path.includes("/object/ihd-monthly-reports/")) snapshot = JSON.parse(String(init?.body));
+    return new Response(null, { status: 201 });
+  };
+  const reply = await summaryLinkReply(store, { SUPABASE_URL: REPORT_STORAGE_ORIGIN, SUPABASE_SERVICE_ROLE_KEY: "server-key" }, employee, "2026-10", false, transport, new Date("2026-10-27T01:00:00Z"));
+  expect(reply.text).toContain("https://ihd-gen.vercel.app/s#");
+  expect(monthlyReportSchema.parse(snapshot).draft.workItems[0]).toMatchObject({ accommodation: 1200, perDiem: 0, accommodationOnly: true, evidenceImage: null });
+});

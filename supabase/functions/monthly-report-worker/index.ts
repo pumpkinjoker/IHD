@@ -1,7 +1,7 @@
 declare const Deno: { env: { get(name: string): string | undefined }; serve(handler: (request: Request) => Promise<Response>): void };
 const REPORT_BUCKET = "ihd-monthly-reports";
 type Employee = { employee_id: string; name: string; email: string; team: string; position: string };
-type Entry = { id: string; data: { workDate: string; subject: string; location: string; imageId: string; expense?: Record<string, unknown> } };
+type Entry = { id: string; data: { workDate: string; subject: string; location: string; imageId: string; kind?: "accommodation"; expense?: Record<string, unknown> } };
 type Job = { id: string; period: string; employee_id: string; line_user_id: string; snapshot: { employee: Employee; entries: Entry[] }; report_url: string | null; push_text: string | null; retry_key: string; expires_at: string };
 type Image = { fileName: string; mimeType: string; dataUrl: string };
 
@@ -9,7 +9,7 @@ export function monthlyPeriod(now = new Date()) {
   const thai = new Date(now.getTime() + 7 * 3600_000);
   return { period: new Date(Date.UTC(thai.getUTCFullYear(), thai.getUTCMonth() - 1, 1)).toISOString().slice(0, 10), day: thai.getUTCDate(), hour: thai.getUTCHours() };
 }
-export function buildMonthlyReport(job: Job, images: Image[]) {
+export function buildMonthlyReport(job: Job, images: (Image | null)[]) {
   const employee = job.snapshot.employee;
   if (employee.employee_id !== job.employee_id || images.length !== job.snapshot.entries.length || !images.length) throw new Error("Report ownership mismatch");
   const [firstName, ...rest] = employee.name.trim().split(/\s+/);
@@ -19,7 +19,7 @@ export function buildMonthlyReport(job: Job, images: Image[]) {
   const workItems = job.snapshot.entries.map((row, index) => ({
     startTime: "08:00", endTime: "17:00", travelFrom: "", travelTo: "", totalKilometers: null, fare: null, accommodation: null,
     perDiem: 300, entertainment: null, otherExpense: null, ...row.data.expense,
-    id: row.id, workDate: row.data.workDate, subject: row.data.subject, location: row.data.location, evidenceImage: images[index], evidenceExpired: false
+    id: row.id, workDate: row.data.workDate, subject: row.data.subject, location: row.data.location, evidenceImage: images[index], evidenceExpired: false, accommodationOnly: row.data.kind === "accommodation"
   }));
   if (workItems.some((item) => !item.workDate.startsWith(month + "-")) || new Set(workItems.map((item) => item.workDate)).size !== workItems.length) throw new Error("Report period mismatch");
   return { version: 1, month, title, expiresAt: new Date(job.expires_at).toISOString(),
@@ -85,6 +85,7 @@ export async function runMonthlyReports(request: Request, env: { url: string }, 
           if (!mediaLocked) throw new Error("Media busy");
           const sourceImages: { row: Entry; source: string; mimeType: string; destination: string }[] = [];
           for (const row of job.snapshot.entries) {
+            if (row.data.kind === "accommodation" && !row.data.imageId) continue;
             const registry = await (await api(`rest/v1/line_evidence_files?${new URLSearchParams({ reference: `eq.${row.data.imageId}`, employee_id: `eq.${job.employee_id}`, purged_at: "is.null", select: "object_path,mime_type", limit: "1" })}`)).json();
             if (!registry[0] || !["image/jpeg", "image/png", "image/webp"].includes(registry[0].mime_type)) throw new Error("Source image missing");
             const extension = registry[0].mime_type === "image/jpeg" ? "jpg" : registry[0].mime_type.split("/")[1];
@@ -101,7 +102,10 @@ export async function runMonthlyReports(request: Request, env: { url: string }, 
             await api(`storage/v1/object/${REPORT_BUCKET}/${objectPath(image.destination)}`, "POST", bytes, { "Content-Type": image.mimeType, "x-upsert": "true", "cache-control": "no-store" });
             images.push({ fileName: image.destination.split("/").at(-1)!, mimeType: image.mimeType, dataUrl: await signed(image.destination, job.expires_at) });
           }
-          const report = buildMonthlyReport(job, images);
+          const report = buildMonthlyReport(job, job.snapshot.entries.map(row => {
+            const index = sourceImages.findIndex(image => image.row.id === row.id);
+            return index < 0 ? null : images[index];
+          }));
           const content = new TextEncoder().encode(JSON.stringify(report));
           await api(`storage/v1/object/${REPORT_BUCKET}/${objectPath(reportPath)}`, "POST", content, { "Content-Type": "application/json", "x-upsert": "true", "cache-control": "no-store" });
           const shortToken = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16)))).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");

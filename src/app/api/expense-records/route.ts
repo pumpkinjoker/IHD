@@ -1,3 +1,4 @@
+import { reportWorkItem } from "@/lib/reports/monthly-report";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { configuredLineStore, configuredEvidenceArchive } from "@/lib/line/config";
@@ -5,7 +6,6 @@ import { SupabaseLineStore } from "@/lib/line/store";
 import { allowsExpenseRecords } from "@/lib/line/local-test-access";
 import { validMonth } from "@/lib/line/records";
 import { EvidenceExpiredError, SupabaseEvidenceArchive } from "@/lib/line/supabase-archive";
-import { createDefaultExpenseWorkItem } from "@/lib/expense-request/form-defaults";
 import { evidenceFileName } from "@/lib/images/evidence-file-name";
 import { expenseWorkItemSchema } from "@/schemas/expense-request-form.schema";
 import type { EvidenceImage } from "@/types/expense-request";
@@ -44,17 +44,19 @@ export async function GET(request: Request) {
       let evidenceImage: EvidenceImage | null = null;
       let evidenceExpired = false;
       try {
-        const media = await archive.readEvidence(row.data.imageId);
-        evidenceImage = {
-        fileName: evidenceFileName(row.data.workDate, media.mimeType),
-        mimeType: media.mimeType as EvidenceImage["mimeType"],
-        dataUrl: `data:${media.mimeType};base64,${media.bytes.toString("base64")}`
-        };
+        if (row.data.imageId) {
+          const media = await archive.readEvidence(row.data.imageId);
+          evidenceImage = {
+            fileName: evidenceFileName(row.data.workDate, media.mimeType),
+            mimeType: media.mimeType as EvidenceImage["mimeType"],
+            dataUrl: `data:${media.mimeType};base64,${media.bytes.toString("base64")}`
+          };
+        }
       } catch (error) {
         if (!(error instanceof EvidenceExpiredError)) throw error;
         evidenceExpired = true;
       }
-      items.push({ ...createDefaultExpenseWorkItem(), ...row.data.expense, id: row.id,
+      items.push({ ...reportWorkItem(row), id: row.id,
         workDate: row.data.workDate, subject: row.data.subject, location: row.data.location, evidenceImage, evidenceExpired });
     }
     return json({ items, month, employeeId });
@@ -93,11 +95,13 @@ export async function POST(request: Request) {
     if (!employee?.active || !row) return json({ error: "ไม่พบรายการของพนักงานในเดือนนี้" }, 404);
     if (rows.some((row) => row.id !== item.id && row.data.workDate === item.workDate)) return json({ error: "บันทึกได้วันละหนึ่งงาน วันที่นี้มีรายการแล้ว" }, 409);
     const archive = configuredEvidenceArchive();
-    const expired = archive instanceof SupabaseEvidenceArchive && await archive.isExpired(row.data.imageId);
+    const accommodationOnly = row.data.kind === "accommodation";
+    if (Boolean(item.accommodationOnly) !== accommodationOnly) return json({ error: "ประเภทรายการไม่ตรงกับข้อมูลเดิม" }, 400);
+    const expired = !accommodationOnly && archive instanceof SupabaseEvidenceArchive && await archive.isExpired(row.data.imageId);
     if (expired && item.workDate !== row.data.workDate) return json({ error: "รายการที่รูปหมดอายุแล้วไม่สามารถย้ายวันที่ได้" }, 400);
-    if (!expired && !item.evidenceImage) return json({ error: "กรุณาแนบรูปหลักฐาน" }, 400);
+    if (!accommodationOnly && !expired && !item.evidenceImage) return json({ error: "กรุณาแนบรูปหลักฐาน" }, 400);
     let change: Awaited<ReturnType<typeof archive.editEvidence>> | undefined;
-    if (!expired) {
+    if (!accommodationOnly && !expired) {
       const image = item.evidenceImage!;
       const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(image.dataUrl);
       if (!match || match[1] !== image.mimeType) return json({ error: "รูปไม่ถูกต้อง" }, 400);

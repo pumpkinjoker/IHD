@@ -1,3 +1,4 @@
+import { hasExpenseKind, type ExpenseEntry } from "./entry-kind";
 import type { EmployeeIntakeState, EmployeeWorkEntry } from "./employee-intake";
 import type { IntakeReply } from "./intake";
 import type { LineEvent } from "./webhook";
@@ -18,7 +19,7 @@ export interface LineStore {
   claimMedia(lease: string): Promise<boolean>;
   releaseMedia(lease: string): Promise<void>;
   listEntries(userId: string, employeeId: string, month: string, offset: number): Promise<EntryPage>;
-  hasEntryForDate(employeeId: string, date: string): Promise<boolean>;
+  hasEntryForDate(employeeId: string, date: string, kind?: "work" | "accommodation"): Promise<boolean>;
 }
 
 export class SupabaseLineStore implements LineStore {
@@ -40,9 +41,10 @@ export class SupabaseLineStore implements LineStore {
     });
     if (!response.ok || (await response.json()).length !== 1) throw new Error("รายการเปลี่ยนไปแล้วหรือวันที่ซ้ำ กรุณาโหลดข้อมูลใหม่");
   }
-  async hasEntryForDate(employeeId: string, date: string) {
-    const params = new URLSearchParams({ employee_id: `eq.${employeeId}`, work_date: `eq.${date}`, select: "id", limit: "1" });
-    return ((await this.call(`line_work_entries?${params}`, undefined, "GET")) as unknown[]).length > 0;
+  async hasEntryForDate(employeeId: string, date: string, kind?: "work" | "accommodation") {
+    const params = new URLSearchParams({ employee_id: `eq.${employeeId}`, work_date: `eq.${date}`, select: "data", limit: "1" });
+    const rows = await this.call(`line_work_entries?${params}`, undefined, "GET") as { data: ExpenseEntry }[];
+    return rows.some(row => !kind || hasExpenseKind(row.data, kind));
   }
   async listEmployees() {
     const rows = await this.call("ihd_employee_directory?select=employee_id,name,active&active=eq.true&order=name.asc", undefined, "GET") as { employee_id: string; name: string; active: boolean }[];

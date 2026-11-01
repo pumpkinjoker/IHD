@@ -64,7 +64,7 @@ export function createLineReceiver(deps: ReceiverDependencies): DurableLineRecei
           const current = claim.state?.conversation ?? INITIAL_EMPLOYEE_INTAKE_STATE;
           const now = new Date(event.timestamp);
           const month = bangkokDate(now).slice(0, 7);
-          const menuRequest = Boolean(deps.summary && current.employee && action.type === "text" && action.text.trim() === "เมนู");
+          const menuRequest = Boolean(current.employee && action.type === "text" && action.text.trim() === "เมนู");
           let summaryRequest = deps.summary && action.type === "text" && current.employee && current.onboarding === "idle" ? parseSummaryCommand(action.text, month) : null;
           let linkRequest = deps.summaryLink && action.type === "text" && current.employee && current.onboarding === "idle" ? parseSummaryLink(action.text, month) : null;
           let staleButton = false;
@@ -75,13 +75,14 @@ export function createLineReceiver(deps: ReceiverDependencies): DurableLineRecei
             recordRequest = parseRecordPostback(data);
             summaryRequest = deps.summary ? parseSummaryPostback(data) : null;
             linkRequest = deps.summaryLink ? parseSummaryLinkPostback(data) : null;
-            // Only an unscoped Start command is allowed from the permanent menu.
-            staleButton = data !== "intake:start" && (!context || context !== claim.state?.buttonContext);
+            // Permanent menu actions can start either kind of draft without context.
+            staleButton = !["intake:start", "intake:accommodation"].includes(data) && (!context || context !== claim.state?.buttonContext);
             action = eventToIntakeAction({ ...event, postback: { data } })!;
           }
           if (action.type === "text" && ["เพิ่มข้อมูล", "เพิ่มข้อมูลหน้างาน"].includes(action.text.trim()) && current.onboarding === "idle" && current.intake.step === "idle") {
             action = { type: "start" };
           }
+          if (action.type === "text" && action.text.trim() === "เบิกค่าที่พัก" && current.onboarding === "idle" && current.intake.step === "idle") action = { type: "startAccommodation" };
           const validPhotoStep = action.type === "image" && current.employee &&
             (current.intake.step === "idle" || current.intake.step === "photo");
           let mediaError: string | null = null;
@@ -126,11 +127,12 @@ export function createLineReceiver(deps: ReceiverDependencies): DurableLineRecei
           if (result.entry) {
             hasMediaLease = hasMediaLease || await deps.store.claimMedia(lease);
             if (!hasMediaLease) throw new Error("Media archive is busy");
-            if (await deps.store.hasEntryForDate(result.entry.employeeId, result.entry.workDate)) {
-              result = { state: current, reply: { text: `วันที่ ${result.entry.workDate} มีรายการแล้วครับ บันทึกได้คนละหนึ่งงานต่อวัน`, buttons: [{ label: "เปลี่ยนวันที่", data: "intake:edit:date" }, { label: "ยกเลิก", data: "intake:cancel" }] } };
-            } else await deps.archive.placeEvidence(result.entry.imageId, result.state.employee!, result.entry.workDate);
+            if (await deps.store.hasEntryForDate(result.entry.employeeId, result.entry.workDate, result.entry.kind === "accommodation" ? "accommodation" : "work")) {
+              result = { state: current, reply: { text: `วันที่ ${result.entry.workDate} มีรายการ${result.entry.kind === "accommodation" ? "ค่าที่พัก" : "หน้างาน"}แล้วครับ กรุณาแก้ไขยอดเดิมในเอกสาร หรือเปลี่ยนวันที่`, buttons: [{ label: "เปลี่ยนวันที่", data: "intake:edit:date" }, { label: "ยกเลิก", data: "intake:cancel" }] } };
+            } else if (result.entry.imageId) await deps.archive.placeEvidence(result.entry.imageId, result.state.employee!, result.entry.workDate);
           }
           const buttons = [...result.reply.buttons];
+          if (result.state.employee && result.state.onboarding === "idle" && result.state.intake.step === "idle") buttons.push({ label: "เบิกค่าที่พัก", data: "intake:accommodation" });
           const summaryData = `summary:${linkRequest?.month || summaryRequest?.month || recordRequest?.month || month}:0`;
           if (deps.summary && result.state.employee && result.state.onboarding === "idle" && !buttons.some((button) => button.data === summaryData) && (menuRequest || summaryRequest || recordRequest || result.state.intake.step === "idle" || (result.state.intake.step === "photo" && !result.state.intake.draft?.imageId))) {
             buttons.push({ label: "ตารางสรุป", data: summaryData });

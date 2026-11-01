@@ -5,6 +5,7 @@ const rawTeamMemberSchema = z
     firstName: z.string().min(1),
     lastName: z.string().min(1),
     name: z.string().min(1),
+    englishName: z.string().min(1).optional(),
     employeeId: z.string().min(1),
     email: z.string().email(),
     position: z.string().min(1)

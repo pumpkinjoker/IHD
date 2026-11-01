@@ -1,5 +1,7 @@
 "use client";
 
+import { masterData, findRequesterByKey } from "@/lib/master-data";
+import type { Team, TeamMember } from "@/types/master-data";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ExpensePreviewToolbar } from "./expense-preview-toolbar";
@@ -11,15 +13,15 @@ import {
 } from "@/lib/storage/expense-request-session-storage";
 import type { ExpenseRequestForm } from "@/types/expense-request";
 
-function CenteredDocumentContainer({ draft }: { draft: ExpenseRequestForm }) {
+function CenteredDocumentContainer({ draft, requester }: { draft: ExpenseRequestForm; requester?: TeamMember }) {
   return (
     <div className="expense-page-stage">
-      <DocumentPackagePreview draft={draft} />
+      <DocumentPackagePreview draft={draft} requesterOverride={requester} />
     </div>
   );
 }
 
-function PreviewLayout({ draft }: { draft: ExpenseRequestForm }) {
+function PreviewLayout({ draft, teams }: { draft: ExpenseRequestForm; teams: Team[] }) {
   const router = useRouter();
   const [printNotice, setPrintNotice] = useState<string>();
 
@@ -48,12 +50,12 @@ function PreviewLayout({ draft }: { draft: ExpenseRequestForm }) {
         onPrint={handlePrint}
         printNotice={printNotice}
       />
-      <CenteredDocumentContainer draft={draft} />
+      <CenteredDocumentContainer draft={draft} requester={findRequesterByKey(draft.requesterKey, teams) ?? undefined} />
     </main>
   );
 }
 
-export function ExpenseRequestPreview() {
+export function ExpenseRequestPreview({ teams = masterData.teams }: { teams?: Team[] }) {
   const router = useRouter();
   const [draft, setDraft] = useState<ExpenseRequestForm | null | undefined>(
     undefined
@@ -61,11 +63,11 @@ export function ExpenseRequestPreview() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setDraft(readExpenseRequestDraft()?.data ?? null);
+      setDraft(readExpenseRequestDraft(teams)?.data ?? null);
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [teams]);
 
   if (draft === undefined) {
     return (
@@ -94,5 +96,5 @@ export function ExpenseRequestPreview() {
     );
   }
 
-  return <PreviewLayout draft={draft} />;
+  return <PreviewLayout draft={draft} teams={teams} />;
 }

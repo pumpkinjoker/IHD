@@ -2,6 +2,7 @@ import rawMasterData from "@/data/master-data.json";
 import {
   masterDataSchema,
   type MasterData,
+  type Team,
   type TeamMember
 } from "@/schemas/master-data.schema";
 
@@ -11,13 +12,13 @@ export function getRequesterKey(member: TeamMember) {
   return member.employeeId;
 }
 
-export function findTeamByKey(teamKey: string) {
-  return masterData.teams.find((team) => team.key === teamKey) ?? null;
+export function findTeamByKey(teamKey: string, teams: Team[] = masterData.teams) {
+  return teams.find((team) => team.key === teamKey) ?? null;
 }
 
-export function findTeamByRequesterKey(requesterKey: string) {
+export function findTeamByRequesterKey(requesterKey: string, teams: Team[] = masterData.teams) {
   return (
-    masterData.teams.find((team) =>
+    teams.find((team) =>
       team.members.some(
         (member) => getRequesterKey(member) === requesterKey
       )
@@ -25,8 +26,8 @@ export function findTeamByRequesterKey(requesterKey: string) {
   );
 }
 
-export function findRequesterByKey(requesterKey: string) {
-  const team = findTeamByRequesterKey(requesterKey);
+export function findRequesterByKey(requesterKey: string, teams: Team[] = masterData.teams) {
+  const team = findTeamByRequesterKey(requesterKey, teams);
 
   return (
     team?.members.find(

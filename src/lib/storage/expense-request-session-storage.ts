@@ -1,5 +1,6 @@
 import { storedExpenseRequestDraftSchema } from "@/schemas/expense-request-form.schema";
-import { findTeamByRequesterKey } from "@/lib/master-data";
+import type { Team } from "@/types/master-data";
+import { masterData, findTeamByRequesterKey } from "@/lib/master-data";
 import type {
   ExpenseRequestForm,
   StoredExpenseRequestDraft
@@ -26,7 +27,8 @@ export function createStoredExpenseRequestDraft(
 }
 
 export function parseStoredExpenseRequestDraft(
-  rawValue: string | null
+  rawValue: string | null,
+  teams: Team[] = masterData.teams
 ): StoredExpenseRequestDraft | null {
   if (!rawValue) {
     return null;
@@ -43,7 +45,7 @@ export function parseStoredExpenseRequestDraft(
     const requesterKey =
       LEGACY_REQUESTER_KEYS[result.data.data.requesterKey] ??
       result.data.data.requesterKey;
-    const team = requesterKey ? findTeamByRequesterKey(requesterKey) : null;
+    const team = requesterKey ? findTeamByRequesterKey(requesterKey, teams) : null;
 
     return {
       ...result.data,
@@ -58,7 +60,7 @@ export function parseStoredExpenseRequestDraft(
   }
 }
 
-export function readExpenseRequestDraft() {
+export function readExpenseRequestDraft(teams: Team[] = masterData.teams) {
   if (typeof window === "undefined") {
     return null;
   }
@@ -69,7 +71,7 @@ export function readExpenseRequestDraft() {
 
   try {
     return parseStoredExpenseRequestDraft(
-      window.sessionStorage.getItem(EXPENSE_REQUEST_DRAFT_STORAGE_KEY)
+      window.sessionStorage.getItem(EXPENSE_REQUEST_DRAFT_STORAGE_KEY), teams
     );
   } catch {
     return null;

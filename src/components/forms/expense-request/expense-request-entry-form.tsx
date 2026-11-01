@@ -430,7 +430,7 @@ function WorkItemEditor({
   );
 }
 
-export function ExpenseRequestEntryForm() {
+export function ExpenseRequestEntryForm({ teams = masterData.teams }: { teams?: import("@/types/master-data").Team[] }) {
   const router = useRouter();
   const storageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isRestored, setIsRestored] = useState(false);
@@ -461,7 +461,7 @@ export function ExpenseRequestEntryForm() {
   const watchedForm = useWatch({ control });
   const teamKey = useWatch({ control, name: "teamKey" });
   const requesterKey = useWatch({ control, name: "requesterKey" });
-  const selectedTeam = useMemo(() => findTeamByKey(teamKey), [teamKey]);
+  const selectedTeam = useMemo(() => findTeamByKey(teamKey, teams), [teamKey, teams]);
   const selectedRequester = useMemo(
     () =>
       selectedTeam?.members.find(
@@ -471,18 +471,18 @@ export function ExpenseRequestEntryForm() {
   );
   const teamOptions = useMemo(
     () =>
-      masterData.teams.map((team) => ({
+      teams.map((team) => ({
         value: team.key,
         label: team.name
       })),
-    []
+    [teams]
   );
   const requesterOptions = useMemo(
     () =>
       selectedTeam?.members.map((member) => ({
         value: member.employeeId,
         label: member.name,
-        keywords: `${member.firstName} ${member.lastName} ${member.employeeId} ${member.email}`
+        keywords: `${member.firstName} ${member.lastName} ${member.englishName ?? ""} ${member.employeeId} ${member.email}`
       })) ?? [],
     [selectedTeam]
   );
@@ -499,7 +499,7 @@ export function ExpenseRequestEntryForm() {
           if (!/^[A-Za-z0-9_-]{22}$/.test(reportToken)) throw new Error("ลิงก์แก้ไขเอกสารไม่ถูกต้อง");
           const response = await fetch("/api/expense-records", { headers: { "x-report-token": reportToken }, cache: "no-store", signal: abort.signal });
           const result = await recordsResponse(response);
-          const team = findTeamByRequesterKey(result.employeeId);
+          const team = findTeamByRequesterKey(result.employeeId, teams);
           if (!team || !/^\d{4}-(0[1-9]|1[0-2])$/.test(result.month) || !Array.isArray(result.items) || result.items.some((item: ExpenseWorkItem) => !item.workDate?.startsWith(`${result.month}-`))) throw new Error("ข้อมูลเอกสารไม่ครบ กรุณาติดต่อผู้ดูแล");
           if (!result.items.length) throw new Error("ไม่พบรายการในเดือนของเอกสาร");
           if (abort.signal.aborted) return;
@@ -515,7 +515,7 @@ export function ExpenseRequestEntryForm() {
         }
         return;
       }
-      const storedDraft = readExpenseRequestDraft();
+      const storedDraft = readExpenseRequestDraft(teams);
       if (storedDraft) {
         const currentMonth = bangkokDate(new Date()).slice(0, 7);
         let scope: { employeeId: string; month: string; reportToken?: string } | null = null;
@@ -531,7 +531,7 @@ export function ExpenseRequestEntryForm() {
     };
     const timer = window.setTimeout(() => { void restore(); }, 0);
     return () => { window.clearTimeout(timer); abort.abort(); };
-  }, [reset]);
+  }, [reset, teams]);
 
   useEffect(() => {
     if (!isRestored) {

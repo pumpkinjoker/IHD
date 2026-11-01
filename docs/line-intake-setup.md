@@ -437,3 +437,14 @@ the same kind are rejected; edit the existing amount through the document form.
 A different LINE account cannot merge into another account's saved row.
 Accommodation-only entries appear in the accommodation column and monthly total,
 open/edit without images, and are omitted from the per-diem evidence pages.
+
+### Web employee selection
+
+The expense entry and preview pages load active employees from
+`ihd_employee_directory` on the server for every request, using the same database
+as LINE. New teams and staff therefore appear after refreshing the web form;
+no employee details need to be added to public source files. Thai/English names,
+emails and employee IDs can be searched in the requester dropdown. Existing team
+keys are preserved for saved drafts. Directory failures show a retry message
+instead of quietly falling back to outdated staff in production. Local runs
+without database configuration retain the sample directory.

@@ -49,7 +49,7 @@ describe("monthly personal report", () => {
       if (init?.method === "PATCH") { pending = false; return Response.json([{ id: job.id }]); }
       throw new Error("Unexpected request");
     };
-    const now = new Date("2026-11-01T01:00:00Z");
+    const now = new Date("2026-11-02T01:00:00Z");
     expect(await (await runMonthlyReports(request(), { url: "https://db.example" }, transport, now)).json()).toMatchObject({ sent: 1 });
     expect(await (await runMonthlyReports(request(), { url: "https://db.example" }, transport, now)).json()).toMatchObject({ sent: 0 });
     expect(pushes).toBe(1);
@@ -73,4 +73,21 @@ it("preserves Event working times in monthly evidence documents", () => {
   const eventJob = { ...job, snapshot: { ...job.snapshot, entries: job.snapshot.entries.map(row => ({ ...row, data: { ...row.data, startTime: "09:30", endTime: "20:00" } })) } };
   const report = buildMonthlyReport(eventJob, eventJob.snapshot.entries.map(() => null));
   expect(report.draft.workItems[0]).toMatchObject({ startTime: "09:30", endTime: "20:00" });
+});
+
+
+it.each([
+  ["2026-11-01T01:00:00Z", 2], // Sunday: first Monday is November 2.
+  ["2026-06-01T01:00:00Z", 1], // Month starts on Monday.
+  ["2027-06-01T01:00:00Z", 7], // Month starts on Tuesday.
+  ["2027-01-01T01:00:00Z", 4]  // Year change.
+])("calculates the first Monday for %s", (iso, scheduledDay) => {
+  expect(monthlyPeriod(new Date(iso)).scheduledDay).toBe(scheduledDay);
+});
+
+it.each(["2026-11-01T01:00:00Z", "2026-11-02T00:59:59Z", "2026-11-02T03:00:00Z", "2026-11-09T01:00:00Z"]) ("does not enqueue or send outside the first Monday window: %s", async iso => {
+  const transport = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ lineToken: "test-token" }));
+  const result = await runMonthlyReports(request(), { url: "https://db.example" }, transport, new Date(iso));
+  expect(await result.json()).toMatchObject({ skipped: "outside_monthly_window" });
+  expect(transport).toHaveBeenCalledOnce();
 });

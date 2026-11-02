@@ -340,7 +340,7 @@ dry-runs cleanup, and removes its own fixtures without sending LINE messages.
 ### Monthly LINE summary delivery
 
 `monthly-report-worker` runs through Supabase Cron job
-`ihd-monthly-personal-reports`: day 1, 08:00 Bangkok, with five-minute retries
+`ihd-monthly-personal-reports`: the first Monday of each month, 08:00 Bangkok, with five-minute retries
 until 09:55 for pending recipients. It selects the previous calendar month.
 People with no work are skipped. A recipient needs exactly one real LINE user
 association; absent/ambiguous recipients are recorded as blocked. Browser test

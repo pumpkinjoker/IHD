@@ -83,7 +83,7 @@ the OA uses the permanent Vercel webhook at
 `https://ihd-gen.vercel.app/api/line/webhook`; no local computer or tunnel is needed.
 Production has intake and summary navigation enabled. LINE Verify and signed
 receiver readiness checks passed. Google Sheets directory sync and email delivery are not implemented yet. Monthly
-LINE summaries are scheduled for the first day at 08:00 Bangkok; see below.
+LINE summaries are scheduled for the first Monday of each month at 08:00 Bangkok; see below.
 See [LINE setup and remaining integration work](docs/line-intake-setup.md).
 
 The active test setup uses `LINE_DATABASE_MODE=supabase` and
@@ -122,7 +122,7 @@ blocked on Vercel. The original `/line/simulator` remains an in-memory demo.
 
 ### Monthly personal summaries
 
-On the first day at 08:00 Bangkok, the bot sends each linked employee with work
+On the first Monday of each month at 08:00 Bangkok, the bot sends each linked employee with work
 in the previous month a private summary link. The page reuses the real expense
 form and supporting evidence, with browser Save as PDF. Unedited LINE entries
 use 300 baht per day; saved web amounts override it. Reports and copied images

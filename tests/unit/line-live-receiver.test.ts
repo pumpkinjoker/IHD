@@ -91,8 +91,8 @@ describe("real LINE processing with durable SQL transactions", () => {
     await h.receiver.receive([postback(confirm)]);
     await h.receiver.receive([message("text", "เมนู")]);
     const buttons = h.line.reply.mock.calls.at(-1)![1].buttons;
-    expect(buttons.map((button) => button.label)).toEqual(["เพิ่มข้อมูล", "เบิกค่าที่พัก", "ตารางสรุป", "ลิงก์เอกสารเบิก"]);
-    expect(buttons.map((button) => button.data.split("|")[0])).toEqual(["intake:start", "intake:accommodation", "summary:2026-10:0", "summary-link:2026-10"]);
+    expect(buttons.map((button) => button.label)).toEqual(["เพิ่มข้อมูล", "เบิกค่าที่พัก", "ตารางสรุป", "ตารางสรุปเดือนที่แล้ว", "ลิงก์เอกสารเบิก"]);
+    expect(buttons.map((button) => button.data.split("|")[0])).toEqual(["intake:start", "intake:accommodation", "summary:2026-10:0", "summary:2026-09:0", "summary-link:2026-10"]);
   });
   it("requests an owned summary link without clearing the draft", async () => {
     const link = vi.fn<NonNullable<ReceiverDependencies["summaryLink"]>>().mockResolvedValue({ text: "ลิงก์ส่วนตัว", buttons: [{ label: "กลับรายการที่ค้าง", data: "intake:resume" }] });
@@ -339,4 +339,23 @@ it("persists Event start and end times through the production SQL transaction", 
   await h.receiver.receive([postback(confirm)]);
   const rows = await db.query<{ data: Record<string, unknown> }>("select data from public.line_work_entries");
   expect(rows.rows[0].data).toMatchObject({ startTime: "09:30", endTime: "18:00", employeeId: employee.employeeId });
+});
+
+
+it("opens last month's owned summary and printable link while preserving the current draft", async () => {
+  const summary = vi.fn<NonNullable<ReceiverDependencies["summary"]>>().mockImplementation(async (_, month) => ({ text: `ตาราง ${month}`, buttons: [{ label: "ลิงก์เอกสารเบิก", data: `summary-link:${month}` }, { label: "กลับรายการที่ค้าง", data: "intake:resume" }] }));
+  const link = vi.fn<NonNullable<ReceiverDependencies["summaryLink"]>>().mockResolvedValue({ text: "ลิงก์เอกสารเดือนก่อน", buttons: [] });
+  const h = harness(summary, link);
+  await prepare(h);
+  await h.receiver.receive([message("text", "เมนู")]);
+  const lastMonth = h.line.reply.mock.calls.at(-1)![1].buttons.find(b => b.label === "ตารางสรุปเดือนที่แล้ว")!;
+  await h.receiver.receive([postback(lastMonth.data)]);
+  expect(summary).toHaveBeenCalledWith(employee, "2026-09", 0, true);
+  const buttons = h.line.reply.mock.calls.at(-1)![1].buttons;
+  expect(buttons.find(b => b.label === "ตารางสรุปเดือนนี้")?.data).toMatch(/^summary:2026-10:0\|/);
+  expect(buttons.find(b => b.label === "ตารางสรุปเดือนที่แล้ว")?.data).toMatch(/^summary:2026-09:0\|/);
+  await h.receiver.receive([postback(buttons.find(b => b.label === "ลิงก์เอกสารเบิก")!.data)]);
+  expect(link).toHaveBeenCalledWith(employee, "2026-09", true);
+  const session = await db.query<{ state: { conversation: { intake: { step: string } } } }>("select state from public.line_sessions where user_id='user-1'");
+  expect(session.rows[0].state.conversation.intake.step).toBe("review");
 });

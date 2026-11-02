@@ -7,7 +7,9 @@ type Image = { fileName: string; mimeType: string; dataUrl: string };
 
 export function monthlyPeriod(now = new Date()) {
   const thai = new Date(now.getTime() + 7 * 3600_000);
-  return { period: new Date(Date.UTC(thai.getUTCFullYear(), thai.getUTCMonth() - 1, 1)).toISOString().slice(0, 10), day: thai.getUTCDate(), hour: thai.getUTCHours() };
+  const firstWeekday = new Date(Date.UTC(thai.getUTCFullYear(), thai.getUTCMonth(), 1)).getUTCDay();
+  const scheduledDay = 1 + (8 - firstWeekday) % 7;
+  return { period: new Date(Date.UTC(thai.getUTCFullYear(), thai.getUTCMonth() - 1, 1)).toISOString().slice(0, 10), day: thai.getUTCDate(), hour: thai.getUTCHours(), scheduledDay };
 }
 export function buildMonthlyReport(job: Job, images: (Image | null)[]) {
   const employee = job.snapshot.employee;
@@ -64,9 +66,9 @@ export async function runMonthlyReports(request: Request, env: { url: string }, 
     const { dryRun = false } = await request.json().catch(() => ({}));
     // This privileged RPC validates the JWT through the Data API before any work.
     const config = await rpc("line_monthly_config", {});
-    const { period, day, hour } = monthlyPeriod(now);
-    if (dryRun) return json({ dryRun: true, period, scheduledDay: 1, scheduledHourBangkok: 8, lineConfigured: Boolean(config.lineToken), emailConfigured: false, delivery: "private_web_link" });
-    if (day !== 1 || hour < 8) return json({ skipped: "outside_monthly_window", period });
+    const { period, day, hour, scheduledDay } = monthlyPeriod(now);
+    if (dryRun) return json({ dryRun: true, period, scheduledDay, scheduledWeekday: "Monday", scheduledHourBangkok: 8, lineConfigured: Boolean(config.lineToken), emailConfigured: false, delivery: "private_web_link" });
+    if (day !== scheduledDay || hour < 8 || hour >= 10) return json({ skipped: "outside_monthly_window", period });
     if (!config.lineToken || config.appOrigin !== "https://ihd-gen.vercel.app") return json({ error: "Monthly delivery is not configured" }, 503);
     await rpc("line_prepare_monthly_reports", { p_period: period });
     const deadline = Date.now() + 65_000;

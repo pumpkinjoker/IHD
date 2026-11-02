@@ -1,3 +1,4 @@
+import { previousExpenseMonth } from "@/lib/dates/expense-period";
 import { randomUUID } from "node:crypto";
 import {
   INITIAL_EMPLOYEE_INTAKE_STATE, transitionEmployeeIntake,
@@ -137,9 +138,22 @@ export function createLineReceiver(deps: ReceiverDependencies): DurableLineRecei
           if (deps.summary && result.state.employee && result.state.onboarding === "idle" && !buttons.some((button) => button.data === summaryData) && (menuRequest || summaryRequest || recordRequest || result.state.intake.step === "idle" || (result.state.intake.step === "photo" && !result.state.intake.draft?.imageId))) {
             buttons.push({ label: "ตารางสรุป", data: summaryData });
           }
+          // Anchor navigation to the current Bangkok month, even while viewing last month.
+          const previousSummaryData = `summary:${previousExpenseMonth(now)}:0`;
+          if (deps.summary && result.state.employee && result.state.onboarding === "idle" &&
+            (menuRequest || summaryRequest || linkRequest || recordRequest || result.state.intake.step === "idle" ||
+              (result.state.intake.step === "photo" && !result.state.intake.draft?.imageId)) &&
+            !buttons.some(button => button.data === previousSummaryData)) {
+            buttons.push({ label: "ตารางสรุปเดือนที่แล้ว", data: previousSummaryData });
+          }
           if (menuRequest && deps.summaryLink && result.state.employee && result.state.onboarding === "idle") {
             buttons.push({ label: "ลิงก์เอกสารเบิก", data: `summary-link:${month}` });
           }
+          if (deps.summary && result.state.employee && result.state.onboarding === "idle" && (summaryRequest || linkRequest)) {
+            const currentSummaryData = `summary:${month}:0`;
+            if (!buttons.some(button => button.data === currentSummaryData)) buttons.push({ label: "ตารางสรุปเดือนนี้", data: currentSummaryData });
+          }
+          for (const button of buttons) if (button.data === previousSummaryData) button.label = "ตารางสรุปเดือนที่แล้ว";
           const rank = (data: string) => data === "intake:start" ? 0 : data.startsWith("summary:") ? 1 : data.startsWith("summary-link:") ? 2 : 3;
           const navigation = buttons.filter((button) => rank(button.data) < 3).sort((a, b) => rank(a.data) - rank(b.data));
           let navigationIndex = 0;

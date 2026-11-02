@@ -41,6 +41,24 @@ export class SupabaseLineStore implements LineStore {
     });
     if (!response.ok || (await response.json()).length !== 1) throw new Error("รายการเปลี่ยนไปแล้วหรือวันที่ซ้ำ กรุณาโหลดข้อมูลใหม่");
   }
+  async createEmployeeEntry(id: string, employeeId: string, data: EmployeeWorkEntry) {
+    const sessions = await this.call(`line_sessions?${new URLSearchParams({ "state->conversation->employee->>employeeId": `eq.${employeeId}`, select: "user_id", limit: "2" })}`, undefined, "GET") as { user_id: string }[];
+    const userId = sessions.length === 1 ? sessions[0].user_id : `web:${employeeId}`;
+    // Register a completed web event first to satisfy the entry's event FK. An
+    // interrupted insert can leave an event only; retrying the same ID is safe.
+    await this.request(`${this.url.replace(/\/$/, "")}/rest/v1/line_events`, {
+      method: "POST", headers: { apikey: this.key, Authorization: `Bearer ${this.key}`, "Content-Type": "application/json", Prefer: "resolution=ignore-duplicates" },
+      body: JSON.stringify({ event_id: id, user_id: userId, event_timestamp: Date.now(), payload: { source: "web" }, status: "done", reply_status: "rejected" }), signal: AbortSignal.timeout(20_000)
+    }).then(response => { if (!response.ok) throw new Error("Could not register web entry"); });
+    await this.call("line_work_entries", { id, employee_id: employeeId, user_id: userId, work_date: data.workDate, data });
+  }
+  async deleteEmployeeEntry(id: string, employeeId: string, previous: EmployeeWorkEntry) {
+    const params = new URLSearchParams({ id: `eq.${id}`, employee_id: `eq.${employeeId}`, data: `eq.${JSON.stringify(previous)}`, select: "id" });
+    const response = await this.request(`${this.url.replace(/\/$/, "")}/rest/v1/line_work_entries?${params}`, {
+      method: "DELETE", headers: { apikey: this.key, Authorization: `Bearer ${this.key}`, Prefer: "return=representation" }, signal: AbortSignal.timeout(20_000), cache: "no-store"
+    });
+    if (!response.ok || (await response.json()).length !== 1) throw new Error("รายการเปลี่ยนไปแล้ว กรุณาโหลดข้อมูลใหม่");
+  }
   async hasEntryForDate(employeeId: string, date: string, kind?: "work" | "accommodation") {
     const params = new URLSearchParams({ employee_id: `eq.${employeeId}`, work_date: `eq.${date}`, select: "data", limit: "1" });
     const rows = await this.call(`line_work_entries?${params}`, undefined, "GET") as { data: ExpenseEntry }[];

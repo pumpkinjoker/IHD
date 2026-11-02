@@ -23,7 +23,7 @@ it.skipIf(process.env.IHD_STORAGE_SMOKE !== "1")("uploads, reads, edits, restore
   const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=", "base64");
   let reference: string | undefined;
   const paths = new Set<string>();
-  const finalPath = (date: string) => `${date.slice(0, 4)}/${date.slice(0, 7)}/00000000/evidence/${date.replaceAll("-", "")}.png`;
+  const finalPath = (date: string) => `${date.slice(0, 4)}/${date.slice(0, 7)}/00000000/evidence/${reference!.slice(9)}/${date.replaceAll("-", "")}.png`;
   try {
     reference = await archive.saveEvidence({ messageId: `storage-smoke-${crypto.randomUUID()}`, workDate: "2026-10-27", employee, bytes: png, mimeType: "image/png" });
     paths.add(`.pending/${reference.slice(9)}/20261027.png`);

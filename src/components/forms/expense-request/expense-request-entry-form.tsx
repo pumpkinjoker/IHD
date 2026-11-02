@@ -450,6 +450,7 @@ export function ExpenseRequestEntryForm({ teams = masterData.teams }: { teams?: 
   const monthLabel = new Intl.DateTimeFormat("th-TH", { month: "long", year: "numeric", timeZone: "Asia/Bangkok" }).format(new Date(`${month}-01T00:00:00+07:00`));
   const [cloudBusy, setCloudBusy] = useState(false);
   const [cloudMessage, setCloudMessage] = useState("");
+  const [pendingRemove, setPendingRemove] = useState<number | null>(null);
   const form = useForm<ExpenseRequestForm>({
     resolver: zodResolver(expenseRequestFormSchema),
     defaultValues: createDefaultExpenseRequestForm(),
@@ -541,7 +542,7 @@ export function ExpenseRequestEntryForm({ teams = masterData.teams }: { teams?: 
         const workItems = storedDraft.data.workItems.filter((item) => !item.workDate || item.workDate.startsWith(`${draftMonth}-`));
         reset({ ...storedDraft.data, workItems: workItems.length ? workItems : [createDefaultExpenseWorkItem()] });
         if (scope && (linked || isAvailableExpenseMonth(scope.month)) && scope.employeeId === storedDraft.data.requesterKey && scope.month === draftMonth
-          && storedDraft.data.workItems.every((item) => item.workDate.startsWith(`${draftMonth}-`))) setCloudScope(scope);
+          && storedDraft.data.workItems.every((item) => (!item.workDate && item.isNew) || item.workDate.startsWith(`${draftMonth}-`))) setCloudScope(scope);
       }
       setIsRestored(true);
     };
@@ -574,6 +575,7 @@ export function ExpenseRequestEntryForm({ teams = masterData.teams }: { teams?: 
     try { sessionStorage.removeItem(CLOUD_SCOPE_KEY); } catch {}
     window.history.replaceState(null, "", window.location.pathname);
     setCloudScope(null);
+    setPendingRemove(null);
     setPendingMonth(null);
     setSelectedMonth(bangkokDate(new Date()).slice(0, 7));
     try { sessionStorage.removeItem(SELECTED_MONTH_KEY); } catch {}
@@ -598,6 +600,7 @@ export function ExpenseRequestEntryForm({ teams = masterData.teams }: { teams?: 
     if (storageTimerRef.current) clearTimeout(storageTimerRef.current);
     setSelectedMonth(nextMonth);
     setCloudScope(null);
+    setPendingRemove(null);
     setPendingMonth(null);
     setCloudMessage("");
     reset(data);
@@ -625,11 +628,17 @@ export function ExpenseRequestEntryForm({ teams = masterData.teams }: { teams?: 
     try {
       if (new Set(data.workItems.map((item) => item.workDate)).size !== data.workItems.length) throw new Error("บันทึกได้วันละหนึ่งงาน กรุณาตรวจสอบวันที่ซ้ำ");
       if ((!cloudScope.reportToken && !isAvailableExpenseMonth(cloudScope.month)) || data.workItems.some((item) => !item.workDate.startsWith(`${cloudScope.month}-`))) throw new Error("วันที่ต้องอยู่ในเดือนของเอกสาร กรุณาเปิดรายการใหม่");
-      for (const item of data.workItems) {
-        const response = await fetch("/api/expense-records", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...cloudScope, item }) });
-        await recordsResponse(response);
+      for (const [index, item] of data.workItems.entries()) {
+        const response = await fetch("/api/expense-records", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...cloudScope, item, operation: item.isNew ? "create" : "update" }) });
+        const result = await recordsResponse(response);
+        const savedId = result.id || item.id;
+        setValue(`workItems.${index}.id`, savedId);
+        setValue(`workItems.${index}.isNew`, false);
+        item.id = savedId;
+        item.isNew = false;
         saved++;
       }
+      writeExpenseRequestDraft(getValues());
       setCloudMessage(`บันทึกแล้ว ${saved} รายการ`);
       return true;
     } catch (error) {
@@ -638,7 +647,25 @@ export function ExpenseRequestEntryForm({ teams = masterData.teams }: { teams?: 
     } finally { setCloudBusy(false); }
   }
 
+  async function removeWorkItem(index: number) {
+    const item = getValues().workItems[index];
+    setPendingRemove(null);
+    if (cloudScope && !item.isNew) {
+      setCloudBusy(true);
+      try {
+        const response = await fetch("/api/expense-records", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...cloudScope, id: item.id }) });
+        await recordsResponse(response);
+        setCloudMessage("ลบรายการแล้ว");
+      } catch (error) { setCloudMessage(error instanceof Error ? error.message : "ลบไม่สำเร็จ"); return; }
+      finally { setCloudBusy(false); }
+    }
+    if (getValues().workItems.length === 1) setValue("workItems", [{ ...createDefaultExpenseWorkItem(), isNew: Boolean(cloudScope) }]);
+    else remove(index);
+    writeExpenseRequestDraft(getValues());
+  }
+
   async function loadCloud(previous = false) {
+    setPendingRemove(null);
     setCloudBusy(true);
     setCloudMessage("กำลังโหลดรายการ…");
     try {
@@ -647,8 +674,8 @@ export function ExpenseRequestEntryForm({ teams = masterData.teams }: { teams?: 
       const response = await fetch(`/api/expense-records?${new URLSearchParams({ employeeId: requesterKey, month: targetMonth })}`, { cache: "no-store" });
       const result = await recordsResponse(response);
       if (!Array.isArray(result.items) || (result.month && result.month !== targetMonth) || result.items.some((item: ExpenseWorkItem) => !item.workDate?.startsWith(`${targetMonth}-`))) throw new Error("ข้อมูลรายการไม่ตรงกับเดือนที่เลือก กรุณาเปิดรายการใหม่");
-      if (!result.items.length) { setCloudMessage("ยังไม่มีรายการที่บันทึกในเดือนที่เลือก"); return; }
-      const loadedDraft = { ...getValues(), workItems: result.items, documentDate: getValues().documentDate || bangkokDate(new Date()) };
+      const loadedItems = result.items.length ? result.items : [{ ...createDefaultExpenseWorkItem(), isNew: true }];
+      const loadedDraft = { ...getValues(), workItems: loadedItems, documentDate: getValues().documentDate || bangkokDate(new Date()) };
       reset(loadedDraft);
       writeExpenseRequestDraft(loadedDraft);
       setSelectedMonth(targetMonth);
@@ -818,10 +845,15 @@ export function ExpenseRequestEntryForm({ teams = masterData.teams }: { teams?: 
           </div>
         </div>
 
+        {pendingRemove !== null && <div role="alert" className="space-y-3 rounded-md border border-border p-4">
+          <p>ต้องการลบรายการที่ {pendingRemove + 1} ออกจากข้อมูลที่บันทึกไว้หรือไม่?</p>
+          <Button variant="destructive" onClick={() => void removeWorkItem(pendingRemove)}>ยืนยันลบรายการ</Button>
+          <Button variant="outline" onClick={() => setPendingRemove(null)}>เก็บรายการไว้</Button>
+        </div>}
         <div className="space-y-4">
           {fields.map((field, index) => (
             <WorkItemEditor
-              canRemove={!cloudScope && fields.length > 1}
+              canRemove={Boolean(cloudScope) || fields.length > 1}
               fieldId={`work-item-${index + 1}`}
               form={form}
               index={index}
@@ -829,11 +861,11 @@ export function ExpenseRequestEntryForm({ teams = masterData.teams }: { teams?: 
               month={month}
               requiresWorkTime={selectedRequester?.department === "Event Activation / Mkt"}
               key={field.id}
-              onRemove={() => remove(index)}
+              onRemove={() => { if (cloudScope && !getValues().workItems[index].isNew) setPendingRemove(index); else void removeWorkItem(index); }}
             />
           ))}
           <div className="flex justify-end">
-            <Button disabled={Boolean(cloudScope)} onClick={() => append(createDefaultExpenseWorkItem())}>
+            <Button onClick={() => append({ ...createDefaultExpenseWorkItem(), isNew: Boolean(cloudScope) })}>
               <Plus aria-hidden="true" className="size-4" />
               เพิ่มรายการงาน
             </Button>

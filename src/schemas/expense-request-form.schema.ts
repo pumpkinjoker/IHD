@@ -39,7 +39,8 @@ export const expenseWorkItemDraftSchema = z
     otherExpense: optionalAmountSchema,
     evidenceImage: evidenceImageSchema.nullable(),
     evidenceExpired: z.boolean().optional(),
-    accommodationOnly: z.boolean().optional()
+    accommodationOnly: z.boolean().optional(),
+    isNew: z.boolean().optional()
   })
   .strip();
 

@@ -59,7 +59,7 @@ export async function GET(request: Request) {
         evidenceExpired = true;
       }
       items.push({ ...reportWorkItem(row), id: row.id,
-        workDate: row.data.workDate, subject: row.data.subject, location: row.data.location, evidenceImage, evidenceExpired });
+        workDate: row.data.workDate, subject: row.data.subject, location: row.data.location, evidenceImage, evidenceExpired, isNew: false });
     }
     return json({ items, month, employeeId });
   } catch (error) { return error instanceof ScopeError ? json({ error: error.message }, error.status) : json({ error: "โหลดรายการหรือรูปไม่สำเร็จ กรุณาลองอีกครั้ง" }, 503); }
@@ -85,7 +85,7 @@ export async function POST(request: Request) {
         chunks.push(chunk.value);
       }
     } finally { await reader.cancel(); }
-    const parsed = scopeSchema.extend({ item: expenseWorkItemSchema }).safeParse(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+    const parsed = scopeSchema.extend({ item: expenseWorkItemSchema, operation: z.enum(["create", "update"]).default("update") }).safeParse(JSON.parse(Buffer.concat(chunks).toString("utf8")));
     if (!parsed.success) return json({ error: "กรุณาตรวจสอบข้อมูลและรูปหลักฐาน" }, 400);
     const { item } = parsed.data;
     const { employeeId, month } = await requestedScope(parsed.data);
@@ -94,10 +94,28 @@ export async function POST(request: Request) {
     if (!await store.claimMedia(lease)) { lease = undefined; return json({ error: "กำลังบันทึกรายการอื่น กรุณาลองใหม่" }, 409); }
     const [employee, rows] = await Promise.all([store.findEmployee(employeeId), store.employeeEntries(employeeId, month)]);
     if (employee?.team === "Event Activation / Mkt" && !item.accommodationOnly && (!item.startTime || !item.endTime)) return json({ error: "กรุณากรอกเวลาเริ่มต้นและเวลาสิ้นสุด" }, 400);
-    const row = rows.find((row) => row.id === item.id);
-    if (!employee?.active || !row) return json({ error: "ไม่พบรายการของพนักงานในเดือนนี้" }, 404);
-    if (rows.some((row) => row.id !== item.id && row.data.workDate === item.workDate)) return json({ error: "บันทึกได้วันละหนึ่งงาน วันที่นี้มีรายการแล้ว" }, 409);
+    const creating = parsed.data.operation === "create";
+    const entryId = creating && !item.id.startsWith(`web:${employeeId}:`) ? `web:${employeeId}:${item.id}` : item.id;
+    const row = rows.find((row) => row.id === entryId);
+    if (!employee?.active || (!creating && !row)) return json({ error: "ไม่พบรายการของพนักงานในเดือนนี้" }, 404);
+    if (rows.some((row) => row.id !== entryId && row.data.workDate === item.workDate)) return json({ error: "บันทึกได้วันละหนึ่งงาน วันที่นี้มีรายการแล้ว" }, 409);
     const archive = configuredEvidenceArchive();
+    if (!row) {
+      if (item.evidenceExpired) return json({ error: "รายการใหม่ต้องแนบรูปหลักฐาน" }, 400);
+      let imageId = "";
+      if (!item.accommodationOnly) {
+        const image = item.evidenceImage;
+        const match = image && /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(image.dataUrl);
+        if (!image || !match || match[1] !== image.mimeType) return json({ error: "กรุณาแนบรูปหลักฐาน" }, 400);
+        imageId = await archive.saveEvidence({ messageId: `web:${randomUUID()}`, workDate: item.workDate, employee, bytes: Buffer.from(match[2], "base64"), mimeType: image.mimeType });
+        // Keep the unique registered upload path; later edits can move it safely.
+      }
+      await store.createEmployeeEntry(entryId, employeeId, { employeeId, employeeName: employee.name, imageId,
+        workDate: item.workDate, subject: item.subject, location: item.location, startTime: item.startTime, endTime: item.endTime,
+        ...(item.accommodationOnly ? { kind: "accommodation" as const, accommodation: item.accommodation ?? 0 } : {}),
+        expense: { ...item, id: entryId, isNew: false, evidenceImage: null, evidenceExpired: false } } as import("@/lib/line/employee-intake").EmployeeWorkEntry);
+      return json({ saved: true, id: entryId });
+    }
     const accommodationOnly = row.data.kind === "accommodation";
     if (Boolean(item.accommodationOnly) !== accommodationOnly) return json({ error: "ประเภทรายการไม่ตรงกับข้อมูลเดิม" }, 400);
     const expired = !accommodationOnly && archive instanceof SupabaseEvidenceArchive && await archive.isExpired(row.data.imageId);
@@ -111,13 +129,35 @@ export async function POST(request: Request) {
       change = await archive.editEvidence(row.data.imageId, employee, item.workDate, Buffer.from(match[2], "base64"), image.mimeType);
     }
     try {
-      await store.updateEmployeeEntry(item.id, employeeId, row.data, { ...row.data,
+      await store.updateEmployeeEntry(entryId, employeeId, row.data, { ...row.data,
         workDate: item.workDate, subject: item.subject, location: item.location,
-        expense: { ...item, evidenceImage: null, evidenceExpired: expired } } as typeof row.data);
+        expense: { ...item, isNew: false, evidenceImage: null, evidenceExpired: expired } } as typeof row.data);
     } catch (error) { await change?.rollback(); throw error; }
     // An old spare file is harmless if cleanup fails after the database commits.
     await change?.commit().catch(() => undefined);
-    return json({ saved: true });
+    return json({ saved: true, id: entryId });
   } catch (error) { return error instanceof ScopeError ? json({ error: error.message }, error.status) : json({ error: "บันทึกไม่สำเร็จ อาจมีวันที่ซ้ำหรือข้อมูลเปลี่ยนไป กรุณาโหลดข้อมูลใหม่" }, 409); }
+  finally { if (lease) await store.releaseMedia(lease).catch(() => undefined); }
+}
+
+
+export async function DELETE(request: Request) {
+  if (!allowsExpenseRecords(request)) return json({ error: "เว็บยังไม่พร้อมเชื่อมฐานข้อมูล" }, 503);
+  const store = configuredLineStore();
+  if (!(store instanceof SupabaseLineStore)) return json({ error: "ยังไม่ได้เชื่อมฐานข้อมูล" }, 503);
+  let lease: string | undefined;
+  try {
+    const parsed = scopeSchema.extend({ id: z.string().min(1).max(200) }).safeParse(await request.json());
+    if (!parsed.success) return json({ error: "ข้อมูลรายการไม่ถูกต้อง" }, 400);
+    const { employeeId, month } = await requestedScope(parsed.data);
+    lease = randomUUID();
+    if (!await store.claimMedia(lease)) { lease = undefined; return json({ error: "กำลังบันทึกรายการอื่น กรุณาลองใหม่" }, 409); }
+    const employee = await store.findEmployee(employeeId);
+    const row = (await store.employeeEntries(employeeId, month)).find(row => row.id === parsed.data.id);
+    if (!employee?.active || !row) return json({ error: "ไม่พบรายการของพนักงานในเดือนนี้" }, 404);
+    await store.deleteEmployeeEntry(row.id, employeeId, row.data);
+    // Evidence remains private and is removed by the existing monthly retention job.
+    return json({ deleted: true });
+  } catch (error) { return error instanceof ScopeError ? json({ error: error.message }, error.status) : json({ error: "ลบไม่สำเร็จ กรุณาโหลดข้อมูลใหม่" }, 409); }
   finally { if (lease) await store.releaseMedia(lease).catch(() => undefined); }
 }

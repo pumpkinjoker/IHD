@@ -20,7 +20,7 @@ export class LocalEvidenceArchive {
     const previous = await this.manifest(key);
     if (!previous || previous.employeeId !== employee.employeeId) throw new Error("Evidence owner mismatch");
     const oldBytes = await readFile(this.file(previous.relativePath));
-    const relativePath = this.relativePath(employee, date, mimeType);
+    const relativePath = path.join(path.dirname(this.relativePath(employee, date, mimeType)), key, evidenceFileName(date, mimeType));
     const target = this.file(relativePath);
     if (relativePath !== previous.relativePath) {
       await mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
@@ -93,7 +93,7 @@ export class LocalEvidenceArchive {
     const key = referenceKey(reference);
     const record = await this.manifest(key);
     if (!record || record.employeeId !== employee.employeeId) throw new Error("Evidence owner mismatch");
-    const relativePath = this.relativePath(employee, date, record.mimeType);
+    const relativePath = path.join(path.dirname(this.relativePath(employee, date, record.mimeType)), key, evidenceFileName(date, record.mimeType));
     if (relativePath !== record.relativePath) {
       const target = this.file(relativePath);
       await mkdir(path.dirname(target), { recursive: true, mode: 0o700 });

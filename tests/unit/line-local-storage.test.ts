@@ -21,7 +21,7 @@ describe("on-disk intake storage", () => {
     const reference = await archive.saveEvidence({ messageId: "web-edit", workDate: "2026-10-26", employee, bytes: png, mimeType: "image/png" });
     await archive.placeEvidence(reference, employee, "2026-10-26");
     const replacement = Buffer.concat([png, Buffer.from("replacement")]);
-    const folder = path.join(root, "media/2026/2026-10/12345678_พนักงาน ทดสอบ/หลักฐาน");
+    const folder = path.join(root, "media/2026/2026-10/12345678_พนักงาน ทดสอบ/หลักฐาน", reference.slice(6));
     const first = await archive.editEvidence(reference, employee, "2026-10-27", replacement, "image/png");
     expect((await archive.readEvidence(reference)).bytes).toEqual(replacement);
     await first.rollback();
@@ -78,14 +78,15 @@ describe("on-disk intake storage", () => {
     const firstFolder = path.join(root, "media/2026/2026-09/12345678_พนักงาน ทดสอบ/หลักฐาน");
     const folders = await readdir(firstFolder);
     expect(folders).toHaveLength(1);
-    expect(folders[0]).toBe("20260930.png");
+    expect(folders[0]).toBe(reference.slice(6));
+    expect(await readdir(path.join(firstFolder, folders[0]))).toEqual(["20260930.png"]);
     await expect(archive.readEvidence("local:../../.env.local")).rejects.toThrow("Invalid local evidence reference");
     await expect(archive.placeEvidence(reference, { ...employee, employeeId: "87654321" }, "2026-09-30")).rejects.toThrow("Evidence owner mismatch");
     await expect(archive.saveEvidence({ ...input, bytes: Buffer.from("invalid") })).rejects.toThrow();
-    expect(await readFile(path.join(firstFolder, folders[0]))).toEqual(png);
+    expect(await readFile(path.join(firstFolder, folders[0], "20260930.png"))).toEqual(png);
     const second = await archive.saveEvidence({ ...input, messageId: "another-message", workDate: "2026-09-30" });
     await archive.placeEvidence(second, employee, "2026-09-30");
-    expect(await readdir(firstFolder)).toEqual(["20260930.png"]);
+    expect((await readdir(firstFolder)).sort()).toEqual([reference.slice(6), second.slice(6)].sort());
     expect((await archive.readEvidence(reference)).bytes).toEqual(png);
   });
 

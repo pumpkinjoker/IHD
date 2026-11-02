@@ -4,7 +4,7 @@ import { SupabaseLineStore } from "@/lib/line/store";
 import { LocalEvidenceArchive } from "@/lib/line/local-archive";
 import { SupabaseEvidenceArchive, EvidenceExpiredError } from "@/lib/line/supabase-archive";
 import { createDefaultExpenseWorkItem } from "@/lib/expense-request/form-defaults";
-import { GET, POST } from "@/app/api/expense-records/route";
+import { GET, POST, DELETE } from "@/app/api/expense-records/route";
 import * as reportScopes from "@/lib/reports/edit-scope";
 
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aXioAAAAASUVORK5CYII=", "base64");
@@ -131,4 +131,29 @@ it("opens and edits accommodation-only records without touching evidence storage
   expect(saved.status).toBe(200);
   expect(updateBody).toMatchObject({ data: { expense: { accommodation: 1500, perDiem: 0 } } });
   expect(LocalEvidenceArchive.prototype.editEvidence).not.toHaveBeenCalled();
+});
+
+
+it("creates a web work entry with durable evidence, then returns the saved ID", async () => {
+  const create = vi.spyOn(SupabaseLineStore.prototype, "createEmployeeEntry").mockResolvedValue(undefined);
+  vi.spyOn(LocalEvidenceArchive.prototype, "saveEvidence").mockResolvedValue("local:" + "b".repeat(64));
+  const response = await POST(request({ employeeId: entry.employeeId, month: "2026-10", operation: "create", item: { ...item(), id: "new-row", workDate: "2026-10-25", isNew: true } }));
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({ id: "web:12345678:new-row" });
+  expect(create).toHaveBeenCalledWith("web:12345678:new-row", entry.employeeId, expect.objectContaining({ imageId: "local:" + "b".repeat(64), expense: expect.objectContaining({ evidenceImage: null, isNew: false }) }));
+});
+it("does not create duplicate dates or accept new entries with fake expired evidence", async () => {
+  const create = vi.spyOn(SupabaseLineStore.prototype, "createEmployeeEntry").mockResolvedValue(undefined);
+  expect((await POST(request({ employeeId: entry.employeeId, month: "2026-10", operation: "create", item: { ...item(), id: "new-row" } }))).status).toBe(409);
+  expect((await POST(request({ employeeId: entry.employeeId, month: "2026-10", operation: "create", item: { ...item(), id: "new-row", workDate: "2026-10-25", evidenceImage: null, evidenceExpired: true } }))).status).toBe(400);
+  expect(create).not.toHaveBeenCalled();
+});
+it("deletes only an existing row belonging to the chosen employee and month", async () => {
+  const remove = vi.spyOn(SupabaseLineStore.prototype, "deleteEmployeeEntry").mockResolvedValue(undefined);
+  const body = { employeeId: entry.employeeId, month: "2026-10", id: row.id };
+  expect((await DELETE(request(body))).status).toBe(200);
+  expect(remove).toHaveBeenCalledWith(row.id, entry.employeeId, entry);
+  expect((await DELETE(request({ ...body, id: "foreign" }))).status).toBe(404);
+  expect((await DELETE(request({ ...body, month: "2026-08" }))).status).toBe(400);
+  expect(remove).toHaveBeenCalledOnce();
 });

@@ -33,10 +33,10 @@ export class SupabaseEvidenceArchive {
     await this.api(`rest/v1/line_evidence_files?${new URLSearchParams({ reference: `eq.${record.reference}`, employee_id: `eq.${record.employee_id}` })}`, "PATCH", record);
   }
   private object(path: string) { return `storage/v1/object/${TEST_EVIDENCE_BUCKET}/${encodedPath(path)}`; }
-  private finalPath(employee: IntakeEmployee, date: string, mimeType: string) {
+  private finalPath(employee: IntakeEmployee, date: string, mimeType: string, reference: string) {
     if (!/^\d{8}$/.test(employee.employeeId)) throw new Error("Invalid employee");
     // Storage object keys use ASCII; the employee's Thai name remains in the DB.
-    return `${date.slice(0, 4)}/${date.slice(0, 7)}/${employee.employeeId}/evidence/${evidenceFileName(date, mimeType)}`;
+    return `${date.slice(0, 4)}/${date.slice(0, 7)}/${employee.employeeId}/evidence/${reference.slice(9)}/${evidenceFileName(date, mimeType)}`;
   }
   private async upload(path: string, bytes: Uint8Array, mimeType: string, replace = false) {
     validateEvidenceBytes(bytes, mimeType);
@@ -69,7 +69,7 @@ export class SupabaseEvidenceArchive {
   async placeEvidence(reference: string, employee: IntakeEmployee, date: string) {
     const previous = await this.record(reference);
     if (previous.employee_id !== employee.employeeId || previous.purged_at) throw new Error("Evidence owner mismatch or expired");
-    const object_path = this.finalPath(employee, date, previous.mime_type);
+    const object_path = this.finalPath(employee, date, previous.mime_type, reference);
     if (previous.object_path === object_path) return;
     const move = (sourceKey: string, destinationKey: string) => this.api("storage/v1/object/move", "POST", { bucketId: TEST_EVIDENCE_BUCKET, sourceKey, destinationKey });
     await move(previous.object_path, object_path);
@@ -86,7 +86,7 @@ export class SupabaseEvidenceArchive {
     const previous = await this.record(reference);
     if (previous.employee_id !== employee.employeeId || previous.purged_at) throw new Error("Evidence owner mismatch or expired");
     const old = await this.readEvidence(reference);
-    const object_path = this.finalPath(employee, date, mimeType);
+    const object_path = this.finalPath(employee, date, mimeType, reference);
     const samePath = object_path === previous.object_path;
     await this.upload(object_path, bytes, mimeType, samePath);
     const rollback = async () => {

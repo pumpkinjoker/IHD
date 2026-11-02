@@ -18,6 +18,20 @@ const rpcNames = new Set(["line_begin_event", "line_finish_event", "line_release
 const databaseFetch: typeof fetch = async (input, init) => {
   const url = new URL(String(input));
   const body = init?.body ? JSON.parse(String(init.body)) : {};
+  if (url.pathname.endsWith("/line_sessions") && init?.method === "GET") {
+    return Response.json((await db.query("select user_id from line_sessions where state#>>'{conversation,employee,employeeId}'=$1", [url.searchParams.get("state->conversation->employee->>employeeId")!.slice(3)])).rows);
+  }
+  if (url.pathname.endsWith("/line_events") && init?.method === "POST") {
+    await db.query("insert into line_events(event_id,user_id,event_timestamp,payload,status,reply_status) values($1,$2,$3,$4,$5,$6) on conflict do nothing", [body.event_id, body.user_id, body.event_timestamp, JSON.stringify(body.payload), body.status, body.reply_status]);
+    return new Response(null, { status: 201 });
+  }
+  if (url.pathname.endsWith("/line_work_entries") && init?.method === "POST") {
+    await db.query("insert into line_work_entries(id,user_id,employee_id,work_date,data) values($1,$2,$3,$4,$5)", [body.id, body.user_id, body.employee_id, body.work_date, JSON.stringify(body.data)]);
+    return new Response(null, { status: 201 });
+  }
+  if (url.pathname.endsWith("/line_work_entries") && init?.method === "DELETE") {
+    return Response.json((await db.query("delete from line_work_entries where id=$1 and employee_id=$2 and data=$3::jsonb returning id", [url.searchParams.get("id")!.slice(3), url.searchParams.get("employee_id")!.slice(3), url.searchParams.get("data")!.slice(3)])).rows);
+  }
   if (url.pathname.endsWith("/line_work_entries") && init?.method === "GET") {
     if (url.searchParams.has("work_date")) return Response.json((await db.query("select data from public.line_work_entries where employee_id=$1 and work_date=$2::date limit 1", [url.searchParams.get("employee_id")!.slice(3),url.searchParams.get("work_date")!.slice(3)])).rows);
     const month = url.searchParams.get("and")!.match(/work_date.gte.(\d{4}-\d{2})/)![1];
@@ -82,6 +96,18 @@ beforeEach(async () => {
   await db.exec("truncate public.line_work_entries, public.line_events, public.line_sessions, public.line_evidence_files; update public.line_media_lock set lease_token=null, lease_until=null;");
 });
 afterAll(async () => { await db?.close(); });
+
+it("saves web entries against the existing LINE binding and guards database deletes", async () => {
+  await register(harness());
+  const data = { employeeId: employee.employeeId, employeeName: employee.name, imageId: "drive:file-1", workDate: "2026-10-25", subject: "web", location: "office" };
+  await store.createEmployeeEntry("web-row", employee.employeeId, data);
+  const saved = await db.query<{ user_id: string; data: typeof data }>("select user_id,data from line_work_entries where id='web-row'");
+  expect(saved.rows[0]).toMatchObject({ user_id: "user-1", data });
+  await expect(store.deleteEmployeeEntry("web-row", "87654321", data)).rejects.toThrow();
+  await expect(store.deleteEmployeeEntry("web-row", employee.employeeId, { ...data, subject: "stale" })).rejects.toThrow();
+  await store.deleteEmployeeEntry("web-row", employee.employeeId, data);
+  expect((await db.query("select id from line_work_entries")).rows).toHaveLength(0);
+});
 
 describe("real LINE processing with durable SQL transactions", () => {
   it("orders the renamed navigation buttons without changing their actions", async () => {

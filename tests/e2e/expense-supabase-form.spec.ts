@@ -2,6 +2,57 @@ import { test, expect } from "@playwright/test";
 import masterData from "../../src/data/master-data.json";
 import { createDefaultExpenseWorkItem } from "../../src/lib/expense-request/form-defaults";
 
+test("adds, edits and deletes loaded records", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-27T02:00:00Z"));
+  const member = masterData.teams[0].members[0];
+  let rows = [{ ...createDefaultExpenseWorkItem(), id: "original", workDate: "2026-10-26", subject: "original", evidenceExpired: true }];
+  let creates = 0, deletes = 0;
+  await page.route("**/api/expense-records**", async route => {
+    if (route.request().method() === "GET") return route.fulfill({ json: { employeeId: member.employeeId, month: "2026-10", items: rows } });
+    const body = route.request().postDataJSON();
+    if (route.request().method() === "DELETE") {
+      rows = rows.filter(row => row.id !== body.id); deletes++;
+      return route.fulfill({ json: { deleted: true } });
+    }
+    const item = { ...body.item, isNew: false };
+    if (body.operation === "create") { item.id = "created"; rows.push(item); creates++; }
+    else rows = rows.map(row => row.id === item.id ? item : row);
+    return route.fulfill({ json: { saved: true, id: item.id } });
+  });
+  await page.goto("/documents/expense-request/new");
+  await page.getByLabel("ทีม", { exact: true }).click();
+  await page.getByRole("option", { name: masterData.teams[0].name, exact: true }).click();
+  await page.getByLabel("ผู้ขอเบิก", { exact: true }).click();
+  await page.getByRole("option", { name: member.name, exact: true }).click();
+  await page.getByRole("button", { name: "เปิดรายการที่บันทึกไว้" }).click();
+  await page.getByLabel("หัวข้องาน", { exact: true }).fill("edited");
+  await page.getByRole("button", { name: "เพิ่มรายการงาน", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => JSON.parse(sessionStorage.getItem("document-generator:expense-request:draft") || "null")?.data.workItems.length)).toBe(2);
+  await page.reload();
+  await expect(page.getByRole("button", { name: "บันทึกการแก้ไข", exact: true })).toBeVisible();
+  await expect(page.getByLabel("หัวข้องาน", { exact: true })).toHaveCount(2);
+  await page.getByLabel("วันที่ปฏิบัติงาน", { exact: true }).nth(1).fill("2026-10-25");
+  await page.getByLabel("หัวข้องาน", { exact: true }).nth(1).fill("new");
+  const chooser = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "อัปโหลดรูป", exact: true }).nth(1).click();
+  await (await chooser).setFiles("public/brand/toa-logo.png");
+  await expect(page.getByText(/ไฟล์: toa-logo/)).toBeVisible();
+  await page.getByRole("button", { name: "บันทึกการแก้ไข", exact: true }).click();
+  await expect(page.getByRole("status")).toHaveText("บันทึกแล้ว 2 รายการ");
+  expect(creates).toBe(1);
+  expect(rows[0].subject).toBe("edited");
+  await page.getByRole("button", { name: "ลบรายการที่ 1", exact: true }).click();
+  expect(deletes).toBe(0);
+  await page.getByRole("button", { name: "ยืนยันลบรายการ", exact: true }).click();
+  await expect(page.getByLabel("หัวข้องาน", { exact: true })).toHaveValue("new");
+  expect(deletes).toBe(1);
+  await page.reload();
+  await expect(page.getByLabel("หัวข้องาน", { exact: true })).toHaveValue("new");
+  await page.getByRole("button", { name: "บันทึกการแก้ไข", exact: true }).click();
+  await expect(page.getByRole("status")).toHaveText("บันทึกแล้ว 1 รายการ");
+  expect(creates).toBe(1);
+});
+
 test("opens monthly LINE records in the original form, edits, saves, reopens and previews", async ({ page }) => {
   await page.clock.setFixedTime(new Date("2026-10-27T01:00:00Z"));
   const member = masterData.teams[0].members[0];
@@ -30,7 +81,7 @@ test("opens monthly LINE records in the original form, edits, saves, reopens and
   await expect(page.getByLabel("หัวข้องาน", { exact: true })).toHaveValue("งานจาก LINE");
   await expect(page.getByLabel("วันที่ปฏิบัติงาน", { exact: true })).toHaveAttribute("min", "2026-10-01");
   await expect(page.getByLabel("วันที่ปฏิบัติงาน", { exact: true })).toHaveAttribute("max", "2026-10-31");
-  await expect(page.getByRole("button", { name: "เพิ่มรายการงาน" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "เพิ่มรายการงาน" })).toBeEnabled();
   await page.getByLabel("หัวข้องาน", { exact: true }).fill("แก้หัวข้องานแล้ว");
   await page.getByLabel("ค่าเบี้ยเลี้ยง", { exact: true }).fill("400");
   await page.getByRole("button", { name: "บันทึกการแก้ไข", exact: true }).click();

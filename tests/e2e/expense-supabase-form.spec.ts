@@ -25,7 +25,7 @@ test("opens monthly LINE records in the original form, edits, saves, reopens and
   await page.getByRole("option", { name: masterData.teams[0].name, exact: true }).click();
   await page.getByLabel("ผู้ขอเบิก", { exact: true }).click();
   await page.getByRole("option", { name: member.name, exact: true }).click();
-  await expect(page.locator("input[type=month]")).toHaveCount(0);
+  await expect(page.getByLabel("เดือนที่ต้องการทำข้อมูล")).toHaveValue("2026-10");
   await page.getByRole("button", { name: "เปิดรายการที่บันทึกไว้" }).click();
   await expect(page.getByLabel("หัวข้องาน", { exact: true })).toHaveValue("งานจาก LINE");
   await expect(page.getByLabel("วันที่ปฏิบัติงาน", { exact: true })).toHaveAttribute("min", "2026-10-01");
@@ -86,4 +86,48 @@ test("loads the previous month summary and keeps its month when reopening the fo
   await page.getByRole("button", { name: "ยืนยันและดูตัวอย่าง", exact: true }).click();
   await expect(page).toHaveURL(/\/preview$/);
   await expect(page.getByText("สรุปเดือนก่อน", { exact: true }).first()).toBeVisible();
+});
+
+
+test("selects a work month, protects unfinished data, and restores that month", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-11-02T02:00:00Z"));
+  const member = masterData.teams[0].members[0];
+  let reads = 0;
+  await page.route("**/api/expense-records**", async route => {
+    reads++;
+    expect(new URL(route.request().url()).searchParams.get("month")).toBe("2026-10");
+    return route.fulfill({ json: { employeeId: member.employeeId, month: "2026-10", items: [{ ...createDefaultExpenseWorkItem(), id: "selected-month", workDate: "2026-10-26", subject: "งานเดือนที่เลือก", evidenceExpired: true }] } });
+  });
+  await page.goto("/documents/expense-request/new");
+  await page.getByLabel("ทีม", { exact: true }).click();
+  await page.getByRole("option", { name: masterData.teams[0].name, exact: true }).click();
+  await page.getByLabel("ผู้ขอเบิก", { exact: true }).click();
+  await page.getByRole("option", { name: member.name, exact: true }).click();
+  await page.getByLabel("เดือนที่ต้องการทำข้อมูล").fill("2026-10");
+  await expect(page.getByLabel("วันที่ปฏิบัติงาน", { exact: true })).toHaveAttribute("max", "2026-10-31");
+  await page.getByRole("button", { name: "เปิดรายการที่บันทึกไว้" }).click();
+  expect(reads).toBe(1);
+  await expect(page.getByLabel("หัวข้องาน", { exact: true })).toHaveValue("งานเดือนที่เลือก");
+  await page.getByLabel("เดือนที่ต้องการทำข้อมูล").fill("2026-09");
+  await page.getByRole("button", { name: "กรอกเดือนเดิมต่อ" }).click();
+  await expect(page.getByLabel("เดือนที่ต้องการทำข้อมูล")).toHaveValue("2026-10");
+  await expect(page.getByLabel("หัวข้องาน", { exact: true })).toHaveValue("งานเดือนที่เลือก");
+  await page.getByLabel("เดือนที่ต้องการทำข้อมูล").fill("2026-09");
+  await page.getByRole("button", { name: "เปลี่ยนเดือนและเริ่มรายการใหม่" }).click();
+  await expect(page.getByLabel("เดือนที่ต้องการทำข้อมูล")).toHaveValue("2026-09");
+  await expect(page.getByLabel("หัวข้องาน", { exact: true })).toHaveValue("");
+  await expect(page.getByRole("button", { name: "เปิดรายการที่บันทึกไว้" })).toBeDisabled();
+  await page.reload();
+  await expect(page.getByLabel("เดือนที่ต้องการทำข้อมูล")).toHaveValue("2026-09");
+  await page.getByLabel("วันที่เอกสาร").fill("2026-11-02");
+  await page.getByLabel("วันที่ปฏิบัติงาน", { exact: true }).fill("2026-09-15");
+  await page.getByLabel("หัวข้องาน", { exact: true }).fill("เอกสารย้อนหลัง");
+  const fileChooser = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "อัปโหลดรูป" }).click();
+  await (await fileChooser).setFiles("public/brand/toa-logo.png");
+  await expect(page.getByText(/ไฟล์: toa-logo/)).toBeVisible();
+  await page.getByRole("button", { name: "ยืนยันและดูตัวอย่าง", exact: true }).click();
+  await expect(page).toHaveURL(/\/preview$/);
+  await expect(page.getByText("เอกสารย้อนหลัง", { exact: true }).first()).toBeVisible();
+  await page.screenshot({ path: "test-results/selected-work-month-preview.png" });
 });

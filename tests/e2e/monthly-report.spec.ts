@@ -61,7 +61,8 @@ test("edits the linked employee's previous-month document using current database
   await expect(page.getByLabel("ผู้ขอเบิก", { exact: true })).toContainText(member.name);
   await expect(page.getByLabel("หัวข้องาน", { exact: true })).toHaveValue("ข้อมูลล่าสุดจากฐานข้อมูล");
   await expect(page.getByLabel("วันที่ปฏิบัติงาน", { exact: true })).toHaveAttribute("max", "2026-10-31");
-  await expect(page.locator("input[type=month]")).toHaveCount(0);
+  await expect(page.getByLabel("เดือนที่ต้องการทำข้อมูล")).toHaveValue("2026-10");
+  await expect(page.getByLabel("เดือนที่ต้องการทำข้อมูล")).toBeDisabled();
   await page.getByLabel("ค่าที่พัก", { exact: true }).fill("1200");
   await page.getByRole("button", { name: "บันทึกการแก้ไข", exact: true }).click();
   await expect(page.getByRole("status")).toHaveText("บันทึกแล้ว 1 รายการ");

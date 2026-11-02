@@ -135,10 +135,10 @@ export class LocalLineStore implements LineStore {
   }
   async findEmployee(employeeId: string): Promise<IntakeEmployee | null> {
     const db = await openLocalDatabase(this.root);
-    const result = await db.query<{ employee_id: string; name: string; active: boolean }>(
-      "select employee_id,name,active from public.ihd_employee_directory where employee_id=$1", [employeeId]);
+    const result = await db.query<{ employee_id: string; name: string; active: boolean; team?: string }>(
+      "select employee_id,name,active,team from public.ihd_employee_directory where employee_id=$1", [employeeId]);
     const employee = result.rows[0];
-    return employee ? { employeeId: employee.employee_id, name: employee.name, active: employee.active } : null;
+    return employee ? { employeeId: employee.employee_id, name: employee.name, active: employee.active, team: employee.team } : null;
   }
   async listEntries(userId: string, employeeId: string, month: string, offset: number): Promise<EntryPage> {
     const db = await openLocalDatabase(this.root);

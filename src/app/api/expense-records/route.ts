@@ -1,3 +1,4 @@
+import { isAvailableExpenseMonth } from "@/lib/dates/expense-period";
 import { reportWorkItem } from "@/lib/reports/monthly-report";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -20,7 +21,8 @@ class ScopeError extends Error { constructor(message: string, readonly status = 
 async function requestedScope(input: z.infer<typeof scopeSchema>) {
   const linked = input.reportToken ? await resolveReportEditScope(input.reportToken) : null;
   if (input.reportToken && !linked) throw new ScopeError("ลิงก์หมดอายุหรือข้อมูลถูกล้างแล้ว กรุณาขอลิงก์ใหม่", 403);
-  const month = linked?.month ?? bangkokDate(new Date()).slice(0, 7);
+  const month = linked?.month ?? input.month ?? bangkokDate(new Date()).slice(0, 7);
+  if (!linked && !isAvailableExpenseMonth(month)) throw new ScopeError("เปิดได้เฉพาะเดือนปัจจุบันและเดือนก่อนหน้า");
   const employeeId = linked?.employeeId ?? input.employeeId;
   if (!employeeId) throw new ScopeError("กรุณาเลือกพนักงาน");
   if ((input.employeeId && input.employeeId !== employeeId) || (input.month && input.month !== month)) throw new ScopeError("รายการต้องเป็นของพนักงานและเดือนเดียวกับเอกสาร");
@@ -91,6 +93,7 @@ export async function POST(request: Request) {
     lease = randomUUID();
     if (!await store.claimMedia(lease)) { lease = undefined; return json({ error: "กำลังบันทึกรายการอื่น กรุณาลองใหม่" }, 409); }
     const [employee, rows] = await Promise.all([store.findEmployee(employeeId), store.employeeEntries(employeeId, month)]);
+    if (employee?.team === "Event Activation / Mkt" && !item.accommodationOnly && (!item.startTime || !item.endTime)) return json({ error: "กรุณากรอกเวลาเริ่มต้นและเวลาสิ้นสุด" }, 400);
     const row = rows.find((row) => row.id === item.id);
     if (!employee?.active || !row) return json({ error: "ไม่พบรายการของพนักงานในเดือนนี้" }, 404);
     if (rows.some((row) => row.id !== item.id && row.data.workDate === item.workDate)) return json({ error: "บันทึกได้วันละหนึ่งงาน วันที่นี้มีรายการแล้ว" }, 409);

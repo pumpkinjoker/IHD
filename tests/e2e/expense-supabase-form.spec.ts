@@ -17,7 +17,7 @@ test("opens monthly LINE records in the original form, edits, saves, reopens and
       return route.fulfill({ json: { saved: true } });
     }
     expect(new URL(route.request().url()).searchParams.get("employeeId")).toBe(member.employeeId);
-    expect(new URL(route.request().url()).searchParams.has("month")).toBe(false);
+    expect(new URL(route.request().url()).searchParams.get("month")).toBe("2026-10");
     return route.fulfill({ json: { items: [saved], month: "2026-10" } });
   });
   await page.goto("/documents/expense-request/new");
@@ -56,4 +56,34 @@ test("shows a Thai error for an empty server response instead of a JSON parsing 
   await page.getByRole("button", { name: "เปิดรายการที่บันทึกไว้" }).click();
   await expect(page.getByRole("status")).toContainText("ฐานข้อมูล");
   await expect(page.getByRole("status")).not.toContainText("JSON");
+});
+
+test("loads the previous month summary and keeps its month when reopening the form", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-11-02T02:00:00Z"));
+  const member = masterData.teams[0].members[0];
+  const item = { ...createDefaultExpenseWorkItem(), id: "last-month-entry", workDate: "2026-10-26", subject: "สรุปเดือนก่อน", location: "สำนักงานใหญ่", fare: 200, evidenceExpired: true };
+  await page.route("**/api/expense-records**", async route => {
+    if (route.request().method() === "POST") {
+      expect(route.request().postDataJSON().month).toBe("2026-10");
+      return route.fulfill({ json: { saved: true } });
+    }
+    expect(new URL(route.request().url()).searchParams.get("month")).toBe("2026-10");
+    return route.fulfill({ json: { employeeId: member.employeeId, month: "2026-10", items: [item] } });
+  });
+  await page.goto("/documents/expense-request/new");
+  await page.getByLabel("ทีม", { exact: true }).click();
+  await page.getByRole("option", { name: masterData.teams[0].name, exact: true }).click();
+  await page.getByLabel("ผู้ขอเบิก", { exact: true }).click();
+  await page.getByRole("option", { name: member.name, exact: true }).click();
+  await page.getByRole("button", { name: "ดึงข้อมูลสรุปเดือนที่แล้ว" }).click();
+  await expect(page.getByText("รายการเดือนตุลาคม 2569", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("วันที่ปฏิบัติงาน", { exact: true })).toHaveValue("2026-10-26");
+  await expect(page.getByLabel("วันที่ปฏิบัติงาน", { exact: true })).toHaveAttribute("min", "2026-10-01");
+  await expect(page.getByText("500.00", { exact: true }).first()).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel("วันที่ปฏิบัติงาน", { exact: true })).toHaveValue("2026-10-26");
+  await expect(page.getByText("รายการเดือนตุลาคม 2569", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "ยืนยันและดูตัวอย่าง", exact: true }).click();
+  await expect(page).toHaveURL(/\/preview$/);
+  await expect(page.getByText("สรุปเดือนก่อน", { exact: true }).first()).toBeVisible();
 });

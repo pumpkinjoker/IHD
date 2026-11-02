@@ -5,7 +5,7 @@ import { createStoredExpenseRequestDraft, parseStoredExpenseRequestDraft } from 
 import { createDefaultExpenseRequestForm } from "@/lib/expense-request/form-defaults";
 
 const env = { NODE_ENV: "production" as const, VERCEL: "1", SUPABASE_URL: "https://database.example", SUPABASE_SERVICE_ROLE_KEY: "test-server-key" };
-const employee = { employee_id: "00000042", name: "ทดสอบ รายชื่อใหม่", english_name: "Test Employee", email: "test@example.com", team: "Field Operations", position: "S2" };
+const employee = { employee_id: "00000042", name: "ทดสอบ รายชื่อใหม่", email: "test@example.com", team: "Field Operations", position: "S2" };
 
 it("loads active database staff into web teams, lookup and restored document drafts", async () => {
   const transport = vi.fn<typeof fetch>(async (input, init) => {
@@ -19,7 +19,7 @@ it("loads active database staff into web teams, lookup and restored document dra
   const teams = await loadExpenseTeams(env, transport);
   expect(teams).toHaveLength(1);
   const member = findRequesterByKey(employee.employee_id, teams);
-  expect(member).toMatchObject({ name: employee.name, email: employee.email, englishName: employee.english_name, department: employee.team });
+  expect(member).toMatchObject({ name: employee.name, email: employee.email, department: employee.team });
   expect(findTeamByRequesterKey(employee.employee_id, teams)?.key).toBe(teams[0].key);
   const stored = createStoredExpenseRequestDraft({ ...createDefaultExpenseRequestForm(), requesterKey: employee.employee_id, teamKey: teams[0].key });
   expect(parseStoredExpenseRequestDraft(JSON.stringify(stored), teams)?.data.requesterKey).toBe(employee.employee_id);

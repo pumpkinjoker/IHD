@@ -68,3 +68,9 @@ it("includes accommodation-only days in monthly totals without per diem or evide
   expect(report.draft.workItems[0]).toMatchObject({ accommodation: 1200, perDiem: 0, evidenceImage: null, accommodationOnly: true });
   expect(monthlyReportMessage(report, "https://ihd-gen.vercel.app/s#sample")).toContain("1,200 บาท");
 });
+
+it("preserves Event working times in monthly evidence documents", () => {
+  const eventJob = { ...job, snapshot: { ...job.snapshot, entries: job.snapshot.entries.map(row => ({ ...row, data: { ...row.data, startTime: "09:30", endTime: "20:00" } })) } };
+  const report = buildMonthlyReport(eventJob, eventJob.snapshot.entries.map(() => null));
+  expect(report.draft.workItems[0]).toMatchObject({ startTime: "09:30", endTime: "20:00" });
+});

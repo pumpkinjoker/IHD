@@ -85,9 +85,9 @@ export class SupabaseLineStore implements LineStore {
     return { entries: rows.slice(0, RECORD_PAGE_SIZE).map((row) => row.data), hasMore: rows.length > RECORD_PAGE_SIZE };
   }
   async findEmployee(employeeId: string): Promise<IntakeEmployee | null> {
-    const params = new URLSearchParams({ employee_id: `eq.${employeeId}`, select: "employee_id,name,active", limit: "1" });
-    const rows = await this.call(`ihd_employee_directory?${params}`, undefined, "GET") as { employee_id: string; name: string; active: boolean }[];
-    return rows[0] ? { employeeId: rows[0].employee_id, name: rows[0].name, active: rows[0].active } : null;
+    const params = new URLSearchParams({ employee_id: `eq.${employeeId}`, select: "employee_id,name,active,team", limit: "1" });
+    const rows = await this.call(`ihd_employee_directory?${params}`, undefined, "GET") as { employee_id: string; name: string; active: boolean; team?: string }[];
+    return rows[0] ? { employeeId: rows[0].employee_id, name: rows[0].name, active: rows[0].active, team: rows[0].team } : null;
   }
   async allEntries(month?: string) {
     const params = new URLSearchParams({ select: "id,data", order: "work_date.desc,created_at.desc", limit: "500" });

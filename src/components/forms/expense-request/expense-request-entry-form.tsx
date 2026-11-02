@@ -24,6 +24,7 @@ import { findTeamByKey, findTeamByRequesterKey, getRequesterKey, masterData } fr
 import { formatMoney } from "@/lib/money/format-money";
 import { toThaiBahtText } from "@/lib/money/thai-baht-text";
 import { cn } from "@/lib/utils";
+import { previousExpenseMonth, isAvailableExpenseMonth } from "@/lib/dates/expense-period";
 import { bangkokDate } from "@/lib/line/intake";
 import {
   clearExpenseRequestDraft,
@@ -62,6 +63,7 @@ type WorkItemEditorProps = {
   form: UseFormReturn<ExpenseRequestForm>;
   onRemove: () => void;
   month: string;
+  requiresWorkTime: boolean;
 };
 
 function WorkItemEditor({
@@ -71,7 +73,8 @@ function WorkItemEditor({
   fieldId,
   form,
   onRemove,
-  month
+  month,
+  requiresWorkTime
 }: WorkItemEditorProps) {
   const [imageError, setImageError] = useState<string>();
   const [isDraggingEvidence, setIsDraggingEvidence] = useState(false);
@@ -207,15 +210,19 @@ function WorkItemEditor({
               <Label htmlFor={`start-time-${fieldId}`}>เวลาเริ่มต้น</Label>
               <Input
                 id={`start-time-${fieldId}`}
+                required={requiresWorkTime && !item.accommodationOnly}
                 type="time"
                 {...register(`workItems.${index}.startTime`)}
+                aria-invalid={Boolean(itemErrors?.startTime)}
               />
+              <FieldError message={itemErrors?.startTime?.message} />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor={`end-time-${fieldId}`}>เวลาสิ้นสุด</Label>
               <Input
                 id={`end-time-${fieldId}`}
+                required={requiresWorkTime && !item.accommodationOnly}
                 type="time"
                 {...register(`workItems.${index}.endTime`)}
                 aria-invalid={Boolean(itemErrors?.endTime)}
@@ -482,7 +489,7 @@ export function ExpenseRequestEntryForm({ teams = masterData.teams }: { teams?: 
       selectedTeam?.members.map((member) => ({
         value: member.employeeId,
         label: member.name,
-        keywords: `${member.firstName} ${member.lastName} ${member.englishName ?? ""} ${member.employeeId} ${member.email}`
+        keywords: `${member.firstName} ${member.lastName} ${member.employeeId} ${member.email}`
       })) ?? [],
     [selectedTeam]
   );
@@ -521,7 +528,7 @@ export function ExpenseRequestEntryForm({ teams = masterData.teams }: { teams?: 
         let scope: { employeeId: string; month: string; reportToken?: string } | null = null;
         try { scope = JSON.parse(sessionStorage.getItem(CLOUD_SCOPE_KEY) || "null"); } catch {}
         const linked = scope?.employeeId === storedDraft.data.requesterKey && /^[A-Za-z0-9_-]{22}$/.test(scope?.reportToken || "") && /^\d{4}-(0[1-9]|1[0-2])$/.test(scope?.month || "");
-        const draftMonth = linked ? scope!.month : currentMonth;
+        const draftMonth = linked || (scope?.employeeId === storedDraft.data.requesterKey && isAvailableExpenseMonth(scope.month)) ? scope!.month : currentMonth;
         const workItems = storedDraft.data.workItems.filter((item) => !item.workDate || item.workDate.startsWith(`${draftMonth}-`));
         reset({ ...storedDraft.data, workItems: workItems.length ? workItems : [createDefaultExpenseWorkItem()] });
         if (scope && scope.employeeId === storedDraft.data.requesterKey && scope.month === draftMonth
@@ -580,7 +587,7 @@ export function ExpenseRequestEntryForm({ teams = masterData.teams }: { teams?: 
     let saved = 0;
     try {
       if (new Set(data.workItems.map((item) => item.workDate)).size !== data.workItems.length) throw new Error("บันทึกได้วันละหนึ่งงาน กรุณาตรวจสอบวันที่ซ้ำ");
-      if ((!cloudScope.reportToken && cloudScope.month !== bangkokDate(new Date()).slice(0, 7)) || data.workItems.some((item) => !item.workDate.startsWith(`${cloudScope.month}-`))) throw new Error("วันที่ต้องอยู่ในเดือนของเอกสาร กรุณาเปิดรายการใหม่");
+      if ((!cloudScope.reportToken && !isAvailableExpenseMonth(cloudScope.month)) || data.workItems.some((item) => !item.workDate.startsWith(`${cloudScope.month}-`))) throw new Error("วันที่ต้องอยู่ในเดือนของเอกสาร กรุณาเปิดรายการใหม่");
       for (const item of data.workItems) {
         const response = await fetch("/api/expense-records", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...cloudScope, item }) });
         await recordsResponse(response);
@@ -594,16 +601,18 @@ export function ExpenseRequestEntryForm({ teams = masterData.teams }: { teams?: 
     } finally { setCloudBusy(false); }
   }
 
-  async function loadCloud() {
+  async function loadCloud(previous = false) {
     setCloudBusy(true);
     setCloudMessage("กำลังโหลดรายการ…");
     try {
-      const month = bangkokDate(new Date()).slice(0, 7);
-      const response = await fetch(`/api/expense-records?${new URLSearchParams({ employeeId: requesterKey })}`, { cache: "no-store" });
+      const month = previous ? previousExpenseMonth() : bangkokDate(new Date()).slice(0, 7);
+      const response = await fetch(`/api/expense-records?${new URLSearchParams({ employeeId: requesterKey, month })}`, { cache: "no-store" });
       const result = await recordsResponse(response);
-      if (!Array.isArray(result.items) || (result.month && result.month !== month) || result.items.some((item: ExpenseWorkItem) => !item.workDate?.startsWith(`${month}-`))) throw new Error("ข้อมูลรายการไม่ตรงกับเดือนปัจจุบัน กรุณาเปิดรายการใหม่");
+      if (!Array.isArray(result.items) || (result.month && result.month !== month) || result.items.some((item: ExpenseWorkItem) => !item.workDate?.startsWith(`${month}-`))) throw new Error("ข้อมูลรายการไม่ตรงกับเดือนที่เลือก กรุณาเปิดรายการใหม่");
       if (!result.items.length) { setCloudMessage("ยังไม่มีรายการที่บันทึกในเดือนนี้"); return; }
-      reset({ ...getValues(), workItems: result.items, documentDate: getValues().documentDate || bangkokDate(new Date()) });
+      const loadedDraft = { ...getValues(), workItems: result.items, documentDate: getValues().documentDate || bangkokDate(new Date()) };
+      reset(loadedDraft);
+      writeExpenseRequestDraft(loadedDraft);
       setCloudScope({ employeeId: requesterKey, month });
       try { sessionStorage.setItem(CLOUD_SCOPE_KEY, JSON.stringify({ employeeId: requesterKey, month })); } catch {}
       setCloudMessage(`โหลดแล้ว ${result.items.length} รายการ แก้ไขข้อมูลในฟอร์มด้านล่างได้เลย`);
@@ -612,6 +621,16 @@ export function ExpenseRequestEntryForm({ teams = masterData.teams }: { teams?: 
   }
 
   async function handleValidSubmit(data: ExpenseRequestForm) {
+    if (selectedRequester?.department === "Event Activation / Mkt") {
+      let missing = false;
+      data.workItems.forEach((item, index) => {
+        if (item.accommodationOnly) return;
+        for (const field of ["startTime", "endTime"] as const) if (!item[field]) {
+          form.setError(`workItems.${index}.${field}`, { message: "กรุณากรอกเวลา" }); missing = true;
+        }
+      });
+      if (missing) return;
+    }
     if (data.workItems.some((item) => !item.workDate.startsWith(`${cloudScope?.month ?? bangkokDate(new Date()).slice(0, 7)}-`))) {
       setCloudMessage("วันที่ปฏิบัติงานต้องอยู่ในเดือนของเอกสาร");
       return;
@@ -696,6 +715,7 @@ export function ExpenseRequestEntryForm({ teams = masterData.teams }: { teams?: 
         <div className="mt-5 flex flex-wrap items-center gap-3">
           <p className="text-sm text-muted-foreground">รายการเดือน{monthLabel}</p>
           <Button disabled={!selectedRequester || !month || Boolean(cloudScope)} onClick={() => void loadCloud()} variant="outline">เปิดรายการที่บันทึกไว้</Button>
+          <Button disabled={!selectedRequester || Boolean(cloudScope)} onClick={() => void loadCloud(true)} variant="outline">ดึงข้อมูลสรุปเดือนที่แล้ว</Button>
           {cloudScope && <Button variant="ghost" onClick={() => { try { sessionStorage.removeItem(CLOUD_SCOPE_KEY); } catch {} window.history.replaceState(null, "", window.location.pathname); setCloudScope(null); setCloudMessage(""); setValue("workItems", [createDefaultExpenseWorkItem()]); }}>เปลี่ยนผู้ขอเบิก</Button>}
         </div>
         {cloudMessage && <p role="status" className="mt-3 text-sm">{cloudMessage}</p>}
@@ -754,6 +774,7 @@ export function ExpenseRequestEntryForm({ teams = masterData.teams }: { teams?: 
               index={index}
               item={watchedItems?.[index] ?? field}
               month={month}
+              requiresWorkTime={selectedRequester?.department === "Event Activation / Mkt"}
               key={field.id}
               onRemove={() => remove(index)}
             />

@@ -3,7 +3,7 @@ import {
   type IntakeAction, type IntakeDraft, type IntakeReply, type IntakeState
 } from "./intake";
 
-export type IntakeEmployee = { employeeId: string; name: string; active: boolean };
+export type IntakeEmployee = { employeeId: string; name: string; active: boolean; team?: string };
 export type EmployeeLookup = (employeeId: string) => IntakeEmployee | null | Promise<IntakeEmployee | null>;
 export type EmployeeIntakeAction = IntakeAction | { type: "confirmEmployee" } | { type: "changeEmployee" };
 export type EmployeeIntakeState = {
@@ -76,20 +76,19 @@ export async function transitionEmployeeIntake(
 
   if (action.type === "confirmEmployee") return reply("เลือกรหัสพนักงานไว้แล้วครับ", [start, change]);
   const imageStartsEntry = action.type === "image" && current.intake.step === "idle";
-  // Check active membership at the start and before committing; no OTP is used.
-  if (action.type === "start" || action.type === "startAccommodation" || action.type === "confirm" || imageStartsEntry) {
-    const employee = await findEmployee(current.employee.employeeId);
-    if (!employee?.active || employee.employeeId !== current.employee.employeeId) return askEmployee();
-  }
+  // Refresh team membership so existing sessions also follow Event time requirements.
+  const employee = await findEmployee(current.employee.employeeId);
+  if (!employee?.active || employee.employeeId !== current.employee.employeeId) return askEmployee();
+  const requiresWorkTime = employee.team === "Event Activation / Mkt";
   const intake = imageStartsEntry
     ? transitionIntake(INITIAL_INTAKE_STATE, { type: "start" }, now).state
     : current.intake;
-  const result = transitionIntake(intake, action, now);
+  const result = transitionIntake(intake, action, now, requiresWorkTime);
   const replyText = action.type === "start" || action.type === "startAccommodation" || imageStartsEntry
-    ? `บันทึกในชื่อ ${current.employee.name} (${current.employee.employeeId})\n${result.reply.text}`
+    ? `บันทึกในชื่อ ${employee.name} (${employee.employeeId})\n${result.reply.text}`
     : result.reply.text;
   return {
-    state: { ...current, intake: result.state },
+    state: { ...current, employee, intake: result.state },
     reply: {
       ...result.reply,
       text: result.state.step === "idle" ? `${replyText}\nครั้งต่อไปส่งรูปเพื่อเริ่มรายการใหม่ได้เลยครับ` : replyText,
@@ -98,7 +97,7 @@ export async function transitionEmployeeIntake(
     ...(result.entry ? { entry: {
       ...result.entry,
       employeeId: current.employee.employeeId,
-      employeeName: current.employee.name
+      employeeName: employee.name
     } } : {})
   };
 }

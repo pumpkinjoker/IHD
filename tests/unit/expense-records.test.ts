@@ -49,7 +49,7 @@ describe("original expense form data API", () => {
     vi.setSystemTime(new Date("2026-11-01T01:00:00Z"));
     vi.spyOn(reportScopes, "resolveReportEditScope").mockResolvedValue({ employeeId: entry.employeeId, month: "2026-10" });
     const token = "a".repeat(22);
-    expect((await GET(request())).status).toBe(400);
+    expect((await GET(request())).status).toBe(200);
     const opened = await GET(new Request("http://127.0.0.1:3000/api/expense-records", { headers: { "x-report-token": token } }));
     expect(opened.status).toBe(200);
     expect(await opened.json()).toMatchObject({ employeeId: entry.employeeId, month: "2026-10" });
@@ -85,10 +85,10 @@ describe("original expense form data API", () => {
     expect(JSON.stringify(items)).not.toContain("server-only");
   });
   it("derives the Bangkok month on the server and rejects cross-month reads and writes", async () => {
-    expect((await GET(new Request("http://127.0.0.1:3000/api/expense-records?employeeId=12345678&month=2026-09"))).status).toBe(400);
+    expect((await GET(new Request("http://127.0.0.1:3000/api/expense-records?employeeId=12345678&month=2026-08"))).status).toBe(400);
     const result = await GET(new Request("http://127.0.0.1:3000/api/expense-records?employeeId=12345678"));
     expect((await result.json()).month).toBe("2026-10");
-    expect((await POST(request({ employeeId: entry.employeeId, month: "2026-09", item: { ...item(), workDate: "2026-09-26" } }))).status).toBe(400);
+    expect((await POST(request({ employeeId: entry.employeeId, month: "2026-08", item: { ...item(), workDate: "2026-08-26" } }))).status).toBe(400);
     expect(LocalEvidenceArchive.prototype.editEvidence).not.toHaveBeenCalled();
   });
   it("updates the same LINE entry and stores amounts without base64 in the database", async () => {

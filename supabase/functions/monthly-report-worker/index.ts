@@ -1,7 +1,7 @@
 declare const Deno: { env: { get(name: string): string | undefined }; serve(handler: (request: Request) => Promise<Response>): void };
 const REPORT_BUCKET = "ihd-monthly-reports";
 type Employee = { employee_id: string; name: string; email: string; team: string; position: string };
-type Entry = { id: string; data: { workDate: string; subject: string; location: string; imageId: string; kind?: "accommodation"; expense?: Record<string, unknown> } };
+type Entry = { id: string; data: { workDate: string; subject: string; location: string; imageId: string; kind?: "accommodation"; startTime?: string; endTime?: string; expense?: Record<string, unknown> } };
 type Job = { id: string; period: string; employee_id: string; line_user_id: string; snapshot: { employee: Employee; entries: Entry[] }; report_url: string | null; push_text: string | null; retry_key: string; expires_at: string };
 type Image = { fileName: string; mimeType: string; dataUrl: string };
 
@@ -17,7 +17,7 @@ export function buildMonthlyReport(job: Job, images: (Image | null)[]) {
   const title = `สรุปยอดเบิกค่าใช้จ่ายเดือน${new Intl.DateTimeFormat("th-TH", { month: "long", year: "numeric", timeZone: "Asia/Bangkok" }).format(new Date(`${month}-01T00:00:00+07:00`))}`;
   const nextMonth = new Date(`${job.period}T00:00:00Z`); nextMonth.setUTCMonth(nextMonth.getUTCMonth() + 1);
   const workItems = job.snapshot.entries.map((row, index) => ({
-    startTime: "08:00", endTime: "17:00", travelFrom: "", travelTo: "", totalKilometers: null, fare: null, accommodation: null,
+    startTime: row.data.startTime ?? "08:00", endTime: row.data.endTime ?? "17:00", travelFrom: "", travelTo: "", totalKilometers: null, fare: null, accommodation: null,
     perDiem: 300, entertainment: null, otherExpense: null, ...row.data.expense,
     id: row.id, workDate: row.data.workDate, subject: row.data.subject, location: row.data.location, evidenceImage: images[index], evidenceExpired: false, accommodationOnly: row.data.kind === "accommodation"
   }));

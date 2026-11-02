@@ -317,12 +317,26 @@ describe("accommodation intake", () => {
     const h = harness();
     await h.receiver.receive([postback("intake:accommodation"), message("text", employee.employeeId)]);
     await h.receiver.receive([postback(latest(h, "employee:confirm|"))]);
-    expect(h.line.reply.mock.calls.at(-1)![1].text).toContain("กรอกวันที่เบิกค่าที่พัก");
+    expect(h.line.reply.mock.calls.at(-1)![1].text).toContain("วันที่เข้าพักวันที่เท่าไหร่ครับ");
     await h.receiver.receive([postback(latest(h, "intake:cancel|")), message("text", "เมนู")]);
     expect(latest(h, "intake:accommodation|")).toBeTruthy();
-    await h.receiver.receive([message("text", "เบิกค่าที่พัก"), message("text", "2026-09-30"), message("text", "0")]);
+    await h.receiver.receive([message("text", "เบิกค่าที่พัก"), message("text", "25"), message("text", "0")]);
     expect(h.line.reply.mock.calls.at(-1)![1].text).toContain("มากกว่า 0");
     await h.receiver.receive([message("text", "1200"), postback(latest(h, "intake:cancel|"))]);
     expect((await db.query("select id from public.line_work_entries")).rows).toHaveLength(0);
   });
+});
+
+it("persists Event start and end times through the production SQL transaction", async () => {
+  const h = harness();
+  const eventEmployee = { ...employee, team: "Event Activation / Mkt" };
+  h.employees.mockReturnValue(eventEmployee);
+  await register(h);
+  await h.receiver.receive([message("image"), message("text", "งาน Event"), message("text", "บางนา")]);
+  expect(h.line.reply.mock.calls.at(-1)![1].text).toBe("เริ่มเวลาเท่าไหร่ครับ");
+  await h.receiver.receive([message("text", "9.30"), message("text", "18")]);
+  const confirm = h.line.reply.mock.calls.at(-1)![1].buttons.find(b => b.data.startsWith("intake:confirm|"))!.data;
+  await h.receiver.receive([postback(confirm)]);
+  const rows = await db.query<{ data: Record<string, unknown> }>("select data from public.line_work_entries");
+  expect(rows.rows[0].data).toMatchObject({ startTime: "09:30", endTime: "18:00", employeeId: employee.employeeId });
 });

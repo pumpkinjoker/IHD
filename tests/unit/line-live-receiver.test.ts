@@ -4,7 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { createLineReceiver, type ReceiverDependencies } from "@/lib/line/receiver";
 import { SupabaseLineStore } from "@/lib/line/store";
 import { LineMediaRejected, LineReplyRejected } from "@/lib/line/client";
-import type { LineEvent } from "@/lib/line/webhook";
+import { toLineMessage, type LineEvent } from "@/lib/line/webhook";
 import type { IntakeReply } from "@/lib/line/intake";
 
 let db: PGlite;
@@ -91,8 +91,14 @@ describe("real LINE processing with durable SQL transactions", () => {
     await h.receiver.receive([postback(confirm)]);
     await h.receiver.receive([message("text", "เมนู")]);
     const buttons = h.line.reply.mock.calls.at(-1)![1].buttons;
-    expect(buttons.map((button) => button.label)).toEqual(["เพิ่มข้อมูล", "เบิกค่าที่พัก", "ตารางสรุป", "ตารางสรุปเดือนที่แล้ว", "ลิงก์เอกสารเบิก"]);
+    expect(buttons.map((button) => button.label)).toEqual(["เพิ่มข้อมูล", "เบิกค่าที่พัก", "ตารางสรุป", "ตารางสรุปเดือนก่อน", "ลิงก์เอกสารเบิก"]);
     expect(buttons.map((button) => button.data.split("|")[0])).toEqual(["intake:start", "intake:accommodation", "summary:2026-10:0", "summary:2026-09:0", "summary-link:2026-10"]);
+    // The entire real menu must stay text + quick replies, even with last month added.
+    const renderedMenu = toLineMessage(h.line.reply.mock.calls.at(-1)![1]);
+    expect(renderedMenu.type).toBe("text");
+    if (renderedMenu.type !== "text") throw new Error("Menu must remain quick replies");
+    expect(renderedMenu.quickReply?.items).toHaveLength(5);
+    expect(renderedMenu.quickReply?.items.every(item => item.action.label.length <= 20)).toBe(true);
   });
   it("requests an owned summary link without clearing the draft", async () => {
     const link = vi.fn<NonNullable<ReceiverDependencies["summaryLink"]>>().mockResolvedValue({ text: "ลิงก์ส่วนตัว", buttons: [{ label: "กลับรายการที่ค้าง", data: "intake:resume" }] });
@@ -348,12 +354,12 @@ it("opens last month's owned summary and printable link while preserving the cur
   const h = harness(summary, link);
   await prepare(h);
   await h.receiver.receive([message("text", "เมนู")]);
-  const lastMonth = h.line.reply.mock.calls.at(-1)![1].buttons.find(b => b.label === "ตารางสรุปเดือนที่แล้ว")!;
+  const lastMonth = h.line.reply.mock.calls.at(-1)![1].buttons.find(b => b.label === "ตารางสรุปเดือนก่อน")!;
   await h.receiver.receive([postback(lastMonth.data)]);
   expect(summary).toHaveBeenCalledWith(employee, "2026-09", 0, true);
   const buttons = h.line.reply.mock.calls.at(-1)![1].buttons;
   expect(buttons.find(b => b.label === "ตารางสรุปเดือนนี้")?.data).toMatch(/^summary:2026-10:0\|/);
-  expect(buttons.find(b => b.label === "ตารางสรุปเดือนที่แล้ว")?.data).toMatch(/^summary:2026-09:0\|/);
+  expect(buttons.find(b => b.label === "ตารางสรุปเดือนก่อน")?.data).toMatch(/^summary:2026-09:0\|/);
   await h.receiver.receive([postback(buttons.find(b => b.label === "ลิงก์เอกสารเบิก")!.data)]);
   expect(link).toHaveBeenCalledWith(employee, "2026-09", true);
   const session = await db.query<{ state: { conversation: { intake: { step: string } } } }>("select state from public.line_sessions where user_id='user-1'");

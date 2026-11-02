@@ -145,7 +145,7 @@ export function createLineReceiver(deps: ReceiverDependencies): DurableLineRecei
             (menuRequest || summaryRequest || linkRequest || recordRequest || result.state.intake.step === "idle" ||
               (result.state.intake.step === "photo" && !result.state.intake.draft?.imageId)) &&
             !buttons.some(button => button.data === previousSummaryData)) {
-            buttons.push({ label: "ตารางสรุปเดือนก่อน", data: previousSummaryData });
+            buttons.push({ label: "ตารางของเดือนที่แล้ว", data: previousSummaryData });
           }
           if (menuRequest && deps.summaryLink && result.state.employee && result.state.onboarding === "idle") {
             buttons.push({ label: "ลิงก์เอกสารเบิก", data: `summary-link:${month}` });
@@ -154,7 +154,7 @@ export function createLineReceiver(deps: ReceiverDependencies): DurableLineRecei
             const currentSummaryData = `summary:${month}:0`;
             if (!buttons.some(button => button.data === currentSummaryData)) buttons.push({ label: "ตารางสรุปเดือนนี้", data: currentSummaryData });
           }
-          for (const button of buttons) if (button.data === previousSummaryData) button.label = "ตารางสรุปเดือนก่อน";
+          for (const button of buttons) if (button.data === previousSummaryData) button.label = "ตารางของเดือนที่แล้ว";
           const rank = (data: string) => data === "intake:start" ? 0 : data.startsWith("summary:") ? 1 : data.startsWith("summary-link:") ? 2 : 3;
           const navigation = buttons.filter((button) => rank(button.data) < 3).sort((a, b) => rank(a.data) - rank(b.data));
           let navigationIndex = 0;

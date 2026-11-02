@@ -37,6 +37,7 @@ it("creates an owned, short-lived preview without touching the final monthly out
   const reply = await summaryLinkReply(store, { SUPABASE_URL: REPORT_STORAGE_ORIGIN, SUPABASE_SERVICE_ROLE_KEY: "server-key" }, employee, "2026-10", true, transport, new Date("2026-10-27T01:00:00Z"));
   const token = reply.text.match(/https:\/\/ihd-gen\.vercel\.app\/s#([A-Za-z0-9_-]{22})/)?.[1];
   expect(token).toBeTruthy();
+  expect(reply.buttons[0]).toMatchObject({ label: "เปิดเอกสาร", url: `https://ihd-gen.vercel.app/s#${token}` });
   expect(linkRow.token_hash).toBe(createHash("sha256").update(token!).digest("hex"));
   expect(linkRow.employee_id).toBe(employee.employeeId);
   const report = monthlyReportSchema.parse(snapshot);

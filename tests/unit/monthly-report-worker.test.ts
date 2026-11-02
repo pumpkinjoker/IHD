@@ -43,7 +43,10 @@ describe("monthly personal report", () => {
       if (path === "https://api.line.me/v2/bot/message/push") {
         pushes++;
         expect((init!.headers as Record<string,string>)["X-Line-Retry-Key"]).toBe(job.retry_key);
-        expect(JSON.parse(init!.body as string)).toEqual({ to: job.line_user_id, messages: [{ type: "text", text: job.push_text }] });
+        const body = JSON.parse(init!.body as string);
+        expect(body.to).toBe(job.line_user_id);
+        expect(body.messages[0]).toMatchObject({ type: "flex", altText: job.push_text });
+        expect(body.messages[0].contents.footer.contents[0].action).toEqual({ type: "uri", label: "เปิดเอกสาร", uri: job.report_url });
         return new Response(null, { status: 409, headers: { "x-line-accepted-request-id": "accepted" } });
       }
       if (init?.method === "PATCH") { pending = false; return Response.json([{ id: job.id }]); }

@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { parseEmployeeIntakePostback, type EmployeeIntakeAction } from "./employee-intake";
-import type { IntakeReply } from "./intake";
+import type { IntakeReply, IntakeButton } from "./intake";
 
 const sourceSchema = z.object({ type: z.string(), userId: z.string().optional() });
 const eventSchema = z.object({
@@ -35,6 +35,12 @@ export function eventToIntakeAction(event: LineEvent): EmployeeIntakeAction | nu
   return { type: "unsupported" };
 }
 
+function lineButtonAction(button: IntakeButton) {
+  return button.url
+    ? { type: "uri" as const, label: button.label, uri: button.url }
+    : { type: "postback" as const, label: button.label, data: button.data, displayText: button.label };
+}
+
 /** LINE message format; same buttons as the simulator. */
 export function toLineMessage(reply: IntakeReply) {
   if (reply.table) {
@@ -63,7 +69,20 @@ export function toLineMessage(reply: IntakeReply) {
         ] })) },
         ...(table.showTotal === false ? [] : [{ type: "separator" }, text(`เบิกค่าใช้จ่ายทั้งหมด ${table.total} บาท`, { size: "14px", weight: "bold", margin: "14px", align: "end" })])
       ] } },
-      ...(reply.buttons.length ? { quickReply: { items: reply.buttons.map((button) => ({ type: "action", action: { type: "postback", label: button.label, data: button.data, displayText: button.label } })) } } : {})
+      ...(reply.buttons.length ? { quickReply: { items: reply.buttons.map((button) => ({ type: "action", action: lineButtonAction(button) })) } } : {})
+    };
+  }
+  // Keep a persistent URI button on document replies for both desktop and mobile.
+  const links = reply.buttons.filter(button => button.url);
+  if (links.length) {
+    const navigation = reply.buttons.filter(button => !button.url);
+    return {
+      type: "flex" as const, altText: reply.text.slice(0, 400),
+      contents: { type: "bubble", size: "mega",
+        body: { type: "box", layout: "vertical", paddingAll: "16px", contents: [{ type: "text", text: reply.text, size: "12px", wrap: true, lineSpacing: "10px" }] },
+        footer: { type: "box", layout: "vertical", paddingAll: "12px", spacing: "sm", contents: links.map(button => ({ type: "button", style: "primary", height: "sm", action: lineButtonAction(button) })) }
+      },
+      ...(navigation.length ? { quickReply: { items: navigation.map(button => ({ type: "action", action: lineButtonAction(button) })) } } : {})
     };
   }
   // Quick reply labels allow 20 characters; Flex buttons allow 40. Preserve the
@@ -71,9 +90,9 @@ export function toLineMessage(reply: IntakeReply) {
   if (reply.buttons.some((button) => button.label.length > 20)) {
     const primary = reply.buttons.filter((button) => button.data.split("|")[0] === "intake:confirm");
     const secondary = reply.buttons.filter((button) => button.data.split("|")[0] !== "intake:confirm");
-    const buttonComponent = (button: { label: string; data: string }, primary = false) => ({
+    const buttonComponent = (button: IntakeButton, primary = false) => ({
       type: "button", style: primary ? "primary" : "secondary", height: "sm",
-      action: { type: "postback", label: button.label, data: button.data, displayText: button.label }
+      action: lineButtonAction(button)
     });
     return {
       type: "flex" as const,
@@ -93,7 +112,7 @@ export function toLineMessage(reply: IntakeReply) {
     text: reply.text,
     ...(reply.buttons.length ? {
       quickReply: { items: reply.buttons.map((button) => ({
-        type: "action", action: { type: "postback", label: button.label, data: button.data, displayText: button.label }
+        type: "action", action: lineButtonAction(button)
       })) }
     } : {})
   };

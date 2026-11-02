@@ -29,7 +29,7 @@ export type IntakeAction =
   | { type: "text"; text: string }
   | { type: "unsupported" };
 
-export type IntakeButton = { label: string; data: string };
+export type IntakeButton = { label: string; data: string; url?: string };
 export type IntakeReply = {
   text: string; buttons: IntakeButton[];
   table?: { title: string; subtitle: string; rows: { date: string; subject: string; location: string; amount: string }[]; total: string; showTotal?: boolean };
@@ -111,6 +111,8 @@ export function transitionIntake(
       { label: "แก้สถานที่", data: "intake:edit:location" },
       ...(requiresWorkTime ? [{ label: "แก้เวลา", data: "intake:edit:startTime" }] : [])]),
       { label: "เปลี่ยนวันที่", data: "intake:edit:date" },
+      { label: "แก้เดือน", data: "intake:edit:dateMonth" },
+      { label: "แก้ปี", data: "intake:edit:dateYear" },
       { label: "กลับสรุป", data: "intake:resume" }
     ] }
   };

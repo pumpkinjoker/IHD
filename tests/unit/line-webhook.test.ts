@@ -74,3 +74,14 @@ describe("LINE webhook boundary", () => {
     expect(message.contents.footer.contents[0]).toMatchObject({ action: { type: "postback", data: "intake:confirm", label: "ใช้แล้วข้อมูลถูกต้องเวรี่กู้ด" } });
   });
 });
+
+
+it("renders a persistent document URI button and keeps navigation as quick replies", () => {
+  const url = "https://ihd-gen.vercel.app/s#" + "a".repeat(22);
+  const message = toLineMessage({ text: "ลิงก์สรุป", buttons: [{ label: "เปิดเอกสาร", data: "report:open", url }, { label: "ตารางของเดือนที่แล้ว", data: "summary:2026-10:0" }] });
+  expect(message.type).toBe("flex");
+  if (message.type !== "flex" || !message.contents.footer) throw new Error("Expected a document button");
+  expect(message.contents.footer.contents[0]).toMatchObject({ action: { type: "uri", label: "เปิดเอกสาร", uri: url } });
+  if (!("quickReply" in message)) throw new Error("Expected navigation");
+  expect(message.quickReply?.items[0].action).toMatchObject({ type: "postback", data: "summary:2026-10:0" });
+});

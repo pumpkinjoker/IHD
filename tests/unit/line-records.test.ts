@@ -9,7 +9,8 @@ describe("compact review and record lookup", () => {
     const review = transitionIntake(state, { type: "resume" }, new Date());
     expect(review.reply.buttons.map((button) => button.label)).toEqual(["ใช้แล้วข้อมูลถูกต้องเวรี่กู้ด", "แก้ไข", "ยกเลิก"]);
     const menu = transitionIntake(state, { type: "editMenu" }, new Date());
-    expect(menu.reply.buttons).toHaveLength(5);
+    expect(menu.reply.buttons).toHaveLength(7);
+    expect(menu.reply.buttons).toEqual(expect.arrayContaining([{ label: "แก้เดือน", data: "intake:edit:dateMonth" }, { label: "แก้ปี", data: "intake:edit:dateYear" }]));
     expect(menu.state).toEqual(state);
     const message = toLineMessage({ ...review.reply, buttons: review.reply.buttons.map((button) => ({ ...button, data: `${button.data}|context` })) });
     expect(message.type).toBe("flex");

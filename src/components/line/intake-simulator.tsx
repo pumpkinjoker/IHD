@@ -128,6 +128,7 @@ export function LineIntakeSimulator({ employees, localPersistence = false, cloud
           ) : null}
           <div className="flex flex-wrap gap-2" aria-label="เมนูแชต">
             {reply.buttons.map((button) => (
+              button.url ? <a key={button.data} href={button.url} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center rounded-md border px-3 text-sm">{button.label}</a> :
               <Button key={button.data} size="sm" variant="outline" disabled={loading || pending} onClick={() => send(parseEmployeeIntakePostback(button.data), button.label, undefined, button.data)}>{button.label}</Button>
             ))}
           </div>

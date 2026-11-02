@@ -52,3 +52,15 @@ it("asks for day only, validates price text, and edits lodging day/month/year se
   run({ type: "text", text: "2568" });
   expect(run({ type: "confirm" }).entry).toMatchObject({ workDate: "2025-10-31", accommodation: 1200.5 });
 });
+
+
+it("edits work month and Buddhist year without changing its times or other data", () => {
+  const state = { step: "review" as const, draft: { workDate: "2026-11-01", subject: "งาน Event", location: "บางนา", imageId: "drive:photo", startTime: "09:30", endTime: "18:00" } };
+  const menu = transitionIntake(state, { type: "editMenu" }, now, true);
+  expect(menu.reply.buttons.map(b => b.data)).toEqual(expect.arrayContaining(["intake:edit:dateMonth", "intake:edit:dateYear"]));
+  const month = transitionIntake(state, parseIntakePostback("intake:edit:dateMonth"), now, true);
+  const revised = transitionIntake(month.state, { type: "text", text: "10" }, now, true);
+  const year = transitionIntake(revised.state, parseIntakePostback("intake:edit:dateYear"), now, true);
+  const result = transitionIntake(year.state, { type: "text", text: "2568" }, now, true);
+  expect(result.state.draft).toMatchObject({ ...state.draft, workDate: "2025-10-01" });
+});

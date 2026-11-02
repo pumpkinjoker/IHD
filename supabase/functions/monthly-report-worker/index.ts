@@ -34,6 +34,16 @@ export function monthlyReportMessage(report: ReturnType<typeof buildMonthlyRepor
   return `${report.title}\n${report.requester.name}\n${report.draft.workItems.length} วัน · เบิกค่าใช้จ่ายรวม ${total.toLocaleString("th-TH", { maximumFractionDigits: 0 })} บาท\n\nเปิดสรุปและบันทึก PDF ตามแบบฟอร์มเดิม:\n${reportUrl}`;
 }
 
+export function monthlyReportLinkMessage(text: string, url: string) {
+  return {
+    type: "flex", altText: text.slice(0, 400),
+    contents: { type: "bubble", size: "mega",
+      body: { type: "box", layout: "vertical", paddingAll: "16px", contents: [{ type: "text", text, size: "12px", wrap: true, lineSpacing: "10px" }] },
+      footer: { type: "box", layout: "vertical", paddingAll: "12px", contents: [{ type: "button", style: "primary", height: "sm", action: { type: "uri", label: "เปิดเอกสาร", uri: url } }] }
+    }
+  };
+}
+
 export async function runMonthlyReports(request: Request, env: { url: string }, transport: typeof fetch = fetch, now = new Date()) {
   const json = (data: unknown, status = 200) => Response.json(data, { status });
   const token = request.headers.get("authorization")?.replace(/^Bearer /, "") || "";
@@ -122,7 +132,7 @@ export async function runMonthlyReports(request: Request, env: { url: string }, 
         if (mediaLocked) { await rpc("line_release_media", { p_lease: lease }); mediaLocked = false; }
         if (!await rpc("line_monthly_mark_attempt", { p_id: job.id, p_lease: lease })) { failed++; continue; }
         const pushed = await transport("https://api.line.me/v2/bot/message/push", { method: "POST", headers: { Authorization: `Bearer ${config.lineToken}`, "Content-Type": "application/json", "X-Line-Retry-Key": job.retry_key },
-          body: JSON.stringify({ to: job.line_user_id, messages: [{ type: "text", text: job.push_text }] }), signal: AbortSignal.timeout(15_000) });
+          body: JSON.stringify({ to: job.line_user_id, messages: [monthlyReportLinkMessage(job.push_text!, job.report_url!)] }), signal: AbortSignal.timeout(15_000) });
         if (pushed.ok || (pushed.status === 409 && pushed.headers.has("x-line-accepted-request-id"))) {
           await update({ status: "sent", sent_at: new Date().toISOString(), lease_token: null, lease_until: null, last_error: null }); sent++;
         } else if (pushed.status >= 400 && pushed.status < 500 && pushed.status !== 429) {
